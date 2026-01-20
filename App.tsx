@@ -6,7 +6,7 @@ import {
   Bird, Globe, RotateCcw, SquareArrowUp, Star, Landmark, ChevronRight, Play, Sparkles,
   Link as LinkIcon, Copy, UserPlus, Zap, LayoutGrid, List, Github, Twitter, MessageSquare, ChevronDown, Monitor, Cpu
 } from 'lucide-react';
-import { Player, Cell, GamePhase, GameLogEntry, PlayerID, GameMode } from './types';
+import { Player, Cell, GamePhase, GameLogEntry, PlayerID, GameMode } from './types.ts';
 // @ts-ignore
 import { Peer } from 'https://esm.sh/peerjs@1.5.4';
 
@@ -955,7 +955,6 @@ const App: React.FC = () => {
 // Components
 const FeatureCard = ({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) => (
   <div className="bg-slate-900/50 border border-white/5 p-12 rounded-[3rem] space-y-6 hover:bg-slate-800 transition-all group">
-    {/* Fix: Explicitly cast the icon element to accept className prop during cloning */}
     <div className="w-20 h-20 bg-slate-950 rounded-3xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-xl">{React.cloneElement(icon as React.ReactElement<any>, { className: "w-10 h-10" })}</div>
     <h3 className="text-3xl font-black">{title}</h3>
     <p className="text-slate-500 font-bold leading-relaxed">{desc}</p>
@@ -966,7 +965,6 @@ const GuideStep = ({ num, title, desc, icon }: { num: string, title: string, des
   <div className="flex gap-8 items-start group">
     <span className="text-8xl font-black text-white/5 group-hover:text-white/10 transition-colors leading-none">{num}</span>
     <div className="space-y-4 pt-4">
-      {/* Fix: Explicitly cast the icon element to accept className prop during cloning */}
       <div className="flex items-center gap-4">{React.cloneElement(icon as React.ReactElement<any>, { className: "w-8 h-8" })}<h3 className="text-4xl font-black">{title}</h3></div>
       <p className="text-slate-500 text-xl font-bold leading-relaxed max-w-lg">{desc}</p>
     </div>
@@ -977,7 +975,6 @@ const HUDButton = ({ icon, label, onClick, color, disabled, active, badge }: { i
   const colors: any = { yellow: 'text-yellow-400', emerald: 'text-emerald-400', blue: 'text-blue-400', red: 'text-red-400', orange: 'text-orange-400', cyan: 'text-cyan-400' };
   return (
     <button onClick={onClick} disabled={disabled} className={`w-24 h-24 rounded-3xl flex flex-col items-center justify-center transition-all relative shrink-0 snap-center ${disabled ? 'opacity-20 grayscale cursor-not-allowed' : 'hover:bg-white/5 active:scale-90'} ${active ? 'bg-yellow-500/20 ring-2 ring-yellow-500' : ''}`}>
-      {/* Fix: Explicitly cast the icon element to accept className prop during cloning */}
       <div className={`mb-1 ${colors[color]}`}>{React.cloneElement(icon as React.ReactElement<any>, { className: "w-6 h-6" })}</div>
       <span className="text-[9px] font-black uppercase text-slate-500 tracking-tighter text-center px-1 leading-none">{label}</span>
       {badge && <span className="absolute top-2 right-2 bg-slate-950 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full border border-white/10">{badge}</span>}
@@ -986,7 +983,6 @@ const HUDButton = ({ icon, label, onClick, color, disabled, active, badge }: { i
 };
 
 const NavBtn = ({ active, icon, onClick }: { active: boolean, icon: React.ReactNode, onClick: () => void }) => (
-  /* Fix: Explicitly cast the icon element to accept className prop during cloning */
   <button onClick={onClick} className={`p-3 rounded-2xl transition-all ${active ? 'bg-yellow-500 text-slate-950 shadow-xl' : 'text-slate-500 bg-slate-950 border border-white/5'}`}>{React.cloneElement(icon as React.ReactElement<any>, { className: "w-6 h-6" })}</button>
 );
 
