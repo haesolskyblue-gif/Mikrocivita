@@ -245,10 +245,6 @@ const deserializePlayer = (p: any): Player => ({
   truceProposals: new Set(p.truceProposals),
 });
 
-/**
- * Helper function to claim land around a specific coordinate for a player.
- * Used during initialization of the Capital to give players a starting territory.
- */
 const claimAround = (pid: number, x: number, y: number, radius: number, playersArr: Player[], gridArr: Cell[][]) => {
   const size = gridArr.length;
   const p = playersArr[pid];
@@ -266,6 +262,71 @@ const claimAround = (pid: number, x: number, y: number, radius: number, playersA
     }
   }
 };
+
+const HUDButton = ({ icon, label, onClick, color, disabled, active, badge }: { icon: React.ReactNode, label: string, onClick: () => void, color: string, disabled?: boolean, active?: boolean, badge?: string|null }) => {
+  const colors: any = { yellow: 'text-yellow-400', emerald: 'text-emerald-400', blue: 'text-blue-400', red: 'text-red-400', orange: 'text-orange-400', cyan: 'text-cyan-400' };
+  return (
+    <button onClick={onClick} disabled={disabled} className={`w-24 h-24 rounded-3xl flex flex-col items-center justify-center transition-all relative shrink-0 snap-center ${disabled ? 'opacity-20 grayscale cursor-not-allowed' : 'hover:bg-white/5 active:scale-90'} ${active ? 'bg-yellow-500/20 ring-2 ring-yellow-500' : ''}`}>
+      <div className={`mb-1 ${colors[color]}`}>{React.cloneElement(icon as React.ReactElement<any>, { className: "w-6 h-6" })}</div>
+      <span className="text-[9px] font-black uppercase text-slate-500 tracking-tighter text-center px-1 leading-none">{label}</span>
+      {badge && <span className="absolute top-2 right-2 bg-slate-950 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full border border-white/10">{badge}</span>}
+    </button>
+  );
+};
+
+const NavBtn = ({ active, icon, onClick }: { active: boolean, icon: React.ReactNode, onClick: () => void }) => (
+  <button onClick={onClick} className={`p-3 rounded-2xl transition-all ${active ? 'bg-yellow-500 text-slate-950 shadow-xl' : 'text-slate-500 bg-slate-950 border border-white/5'}`}>{React.cloneElement(icon as React.ReactElement<any>, { className: "w-6 h-6" })}</button>
+);
+
+const CivilizationIntel = ({ players, currentIdx, grid, t, getPlayerScore, myPlayerId, mode }: any) => (
+  <div className="space-y-4">
+    {players.map((p: Player) => {
+      const limit = 25 + p.cities.length * 10;
+      return (
+        <div key={p.id} className={`p-6 rounded-[2rem] border transition-all ${p.eliminated ? 'opacity-20 grayscale' : p.id === currentIdx ? 'bg-slate-800 border-yellow-500 shadow-2xl' : 'bg-slate-900 border-white/5'}`}>
+          <div className="flex justify-between items-center mb-4">
+            <span className="font-black text-sm flex items-center gap-2" style={{ color: p.color }}>{p.name} {mode === 'online' && myPlayerId === p.id && <Monitor className="w-3 h-3"/>}</span>
+            <div className="flex items-center gap-1 bg-slate-950 px-2 py-0.5 rounded-full text-[10px] font-black text-yellow-500 border border-white/5"><Star className="w-3 h-3"/> {getPlayerScore(p.id, players, grid)}</div>
+          </div>
+          <div className="space-y-3 opacity-80 text-[10px] font-bold">
+            <div className="flex justify-between"><span>{t('capLv', { lv: p.capitalLevel })}</span><span>{p.cities.length} {t('city')}</span></div>
+            <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden"><div className="h-full bg-yellow-500 transition-all duration-500" style={{ width: `${Math.min(100, (p.territory.size / limit) * 100)}%` }} /></div>
+            <div className="flex justify-between text-[8px] font-black text-slate-500 uppercase"><span>{t('status')}</span><span>{p.territory.size}/{limit}</span></div>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+);
+
+const LogChronicle = ({ logs, players, t }: any) => (
+  <div className="space-y-3">
+    {logs.map((log: GameLogEntry, i: number) => (
+      <div key={i} className={`p-4 rounded-2xl border text-xs font-bold space-y-1 ${log.type === 'war' ? 'bg-red-950/20 border-red-900/40 text-red-300' : log.type === 'growth' ? 'bg-emerald-950/20 border-emerald-900/40 text-emerald-300' : 'bg-slate-900/50 border-white/5 text-slate-300'}`}>
+        <div className="flex justify-between items-center opacity-40 text-[9px] uppercase tracking-tighter"><span>Year {log.turn}</span>{log.playerId >= 0 && <span style={{ color: players[log.playerId]?.color }}>{players[log.playerId]?.name}</span>}</div>
+        <p className="leading-relaxed">{log.text}</p>
+      </div>
+    ))}
+  </div>
+);
+
+const FeatureCard = ({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) => (
+  <div className="bg-slate-900/50 border border-white/5 p-12 rounded-[3rem] space-y-6 hover:bg-slate-800 transition-all group">
+    <div className="w-20 h-20 bg-slate-950 rounded-3xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-xl">{React.cloneElement(icon as React.ReactElement<any>, { className: "w-10 h-10" })}</div>
+    <h3 className="text-3xl font-black">{title}</h3>
+    <p className="text-slate-500 font-bold leading-relaxed">{desc}</p>
+  </div>
+);
+
+const GuideStep = ({ num, title, desc, icon }: { num: string, title: string, desc: string, icon: React.ReactNode }) => (
+  <div className="flex gap-8 items-start group">
+    <span className="text-8xl font-black text-white/5 group-hover:text-white/10 transition-colors leading-none">{num}</span>
+    <div className="space-y-4 pt-4">
+      <div className="flex items-center gap-4">{React.cloneElement(icon as React.ReactElement<any>, { className: "w-8 h-8" })}<h3 className="text-4xl font-black">{title}</h3></div>
+      <p className="text-slate-500 text-xl font-bold leading-relaxed max-w-lg">{desc}</p>
+    </div>
+  </div>
+);
 
 const App: React.FC = () => {
   const [lang, setLang] = useState<Lang>('en');
@@ -293,7 +354,6 @@ const App: React.FC = () => {
   const [joinId, setJoinId] = useState<string>('');
   const [onlineStatus, setOnlineStatus] = useState<'idle' | 'connecting' | 'lobby'>('idle');
 
-  // Refs to avoid stale closures in PeerJS callbacks
   const connectionsRef = useRef<any[]>([]);
   const isHostRef = useRef<boolean>(false);
   const playersRef = useRef<Player[]>([]);
@@ -315,13 +375,13 @@ const App: React.FC = () => {
   const currentPlayer = players[currentIdx];
   const isMyTurn = mode === 'local' || (myPlayerId !== null && currentIdx === myPlayerId);
 
-  const t = (key: keyof typeof TRANSLATIONS['en'], params: Record<string, any> = {}) => {
+  const t = useCallback((key: keyof typeof TRANSLATIONS['en'], params: Record<string, any> = {}) => {
     let str = TRANSLATIONS[lang][key] || key;
     Object.entries(params).forEach(([k, v]) => {
       str = str.replace(`{${k}}`, String(v));
     });
     return str;
-  };
+  }, [lang]);
 
   const getUpgradeCooldown = (targetLevel: number) => {
     if (targetLevel >= 2 && targetLevel <= 4) return 2;
@@ -351,17 +411,17 @@ const App: React.FC = () => {
     return score;
   }, []);
 
-  const addLog = (pid: number, text: string, type: GameLogEntry['type'] = 'info', currentLogs?: GameLogEntry[], currentTurn?: number) => {
+  const addLog = useCallback((pid: number, text: string, type: GameLogEntry['type'] = 'info', currentLogs?: GameLogEntry[], currentTurn?: number) => {
     const entry = { turn: currentTurn || turnRef.current, playerId: pid, text, type };
     const newLogs = [entry, ...(currentLogs || logsRef.current)];
     setLogs(newLogs);
     return newLogs;
-  };
+  }, []);
 
-  const showMessage = (msg: string) => {
+  const showMessage = useCallback((msg: string) => {
     setMessage(msg);
     setTimeout(() => setMessage(null), 3500);
-  };
+  }, []);
 
   const syncGameState = (updatedPlayers: Player[], updatedGrid: Cell[][], updatedCurrentIdx: number, updatedTurn: number, updatedPhase: GamePhase, updatedLogs: GameLogEntry[]) => {
     if (mode === 'online') {
@@ -398,84 +458,26 @@ const App: React.FC = () => {
     return { phase: phaseRef.current as GamePhase, logs: currentLogs };
   };
 
-  const resetToLanding = () => {
-    if (peer) peer.destroy();
-    setUiState('landing');
-    setPlayers([]);
-    setGrid([]);
-    setPhase('setup');
-    setGameTurn(1);
-    setLogs([]);
-    setCurrentIdx(0);
-    setConnections([]);
-    setPeer(null);
-    setOnlineStatus('idle');
-    setMobileView('map');
-  };
-
-  const handleHost = () => {
-    setOnlineStatus('connecting');
-    const newPeer = new Peer();
-    newPeer.on('open', (id: string) => {
-      setRoomId(id);
-      setIsHost(true);
-      isHostRef.current = true;
-      setMyPlayerId(0);
-      setOnlineStatus('lobby');
-      setPeer(newPeer);
-    });
-    newPeer.on('connection', (conn: any) => {
-      setConnections(prev => {
-        const next = [...prev, conn];
-        connectionsRef.current = next;
-        return next;
-      });
-      conn.on('data', (data: any) => handleIncomingData(data, conn));
-    });
-  };
-
-  const handleJoin = () => {
-    setOnlineStatus('connecting');
-    const newPeer = new Peer();
-    newPeer.on('open', () => {
-      setPeer(newPeer);
-      const conn = newPeer.connect(joinId);
-      conn.on('open', () => {
-        setConnections([conn]);
-        connectionsRef.current = [conn];
-        setIsHost(false);
-        isHostRef.current = false;
-        setOnlineStatus('lobby');
-      });
-      conn.on('data', (data: any) => handleIncomingData(data));
-    });
-  };
-
-  const handleIncomingData = (data: any, conn?: any) => {
-    if (data.type === 'SYNC_STATE') {
-      const p = data.payload.players.map(deserializePlayer);
-      const g = data.payload.grid;
-      const ci = data.payload.currentIdx;
-      const turn = data.payload.turn;
-      const ph = data.payload.phase;
-      const lg = data.payload.logs;
-
-      setPlayers(p);
-      setGrid(g);
-      setCurrentIdx(ci);
-      setGameTurn(turn);
-      setPhase(ph);
-      setLogs(lg);
-      setUiState('game');
-
-      if (isHostRef.current) {
-        connectionsRef.current.forEach(c => { if (c !== conn) c.send(data); });
-      }
-    } else if (data.type === 'START_GAME') {
-        setMyPlayerId(data.myId);
-        setUiState('game');
-    }
-  };
+  const proceedToConfig = useCallback(() => {
+    const initialPlayers: Player[] = Array.from({ length: playerCount }).map((_, i) => ({
+      id: i,
+      name: lang === 'ko' ? `문명 ${i + 1}` : `Civ ${i + 1}`,
+      color: DEFAULT_COLORS[i % DEFAULT_COLORS.length],
+      capital: null,
+      capitalLevel: 1,
+      capitalUpgrade: null,
+      cities: [],
+      territory: new Set<string>(),
+      originalTerritories: new Set<string>(),
+      warWith: new Set<PlayerID>(),
+      truceWith: new Set<PlayerID>(),
+      truceTurns: {} as Record<PlayerID, number>,
+      truceProposals: new Set<PlayerID>(),
+      eliminated: false,
+    }));
+    setPlayers(initialPlayers);
+    setUiState('config');
+  }, [playerCount, lang]);
 
   const initGameGrid = () => {
     const size = GRID_SIZE_MAP[playerCount];
@@ -509,27 +511,6 @@ const App: React.FC = () => {
         connections.forEach((conn, i) => conn.send({ type: 'START_GAME', myId: i + 1 }));
         syncGameState(initialPlayers, initialGrid, 0, 1, 'setup', initLogs);
     }
-  };
-
-  const proceedToConfig = () => {
-    const initialPlayers: Player[] = Array.from({ length: playerCount }).map((_, i) => ({
-      id: i,
-      name: lang === 'ko' ? `문명 ${i + 1}` : `Civ ${i + 1}`,
-      color: DEFAULT_COLORS[i % DEFAULT_COLORS.length],
-      capital: null,
-      capitalLevel: 1,
-      capitalUpgrade: null,
-      cities: [],
-      territory: new Set<string>(),
-      originalTerritories: new Set<string>(),
-      warWith: new Set<PlayerID>(),
-      truceWith: new Set<PlayerID>(),
-      truceTurns: {} as Record<PlayerID, number>,
-      truceProposals: new Set<PlayerID>(),
-      eliminated: false,
-    }));
-    setPlayers(initialPlayers);
-    setUiState('config');
   };
 
   const nextTurn = (updatedGrid?: Cell[][], updatedPlayers?: Player[], updatedLogs?: GameLogEntry[]) => {
@@ -612,7 +593,6 @@ const App: React.FC = () => {
       p.capital = { x, y };
       p.territory.add(`${y},${x}`);
       newGrid[y][x] = { owner: currentIdxRef.current, type: 'capital', control: 'capital', level: 1 };
-      // Added missing claimAround function call to initialize player territory.
       claimAround(currentIdxRef.current, x, y, 1, newPlayers, newGrid);
       newPlayers[currentIdxRef.current] = p;
       
@@ -793,8 +773,107 @@ const App: React.FC = () => {
     });
   };
 
+  const resetToLanding = () => {
+    if (peer) peer.destroy();
+    setUiState('landing');
+    setPlayers([]);
+    setGrid([]);
+    setPhase('setup');
+    setGameTurn(1);
+    setLogs([]);
+    setCurrentIdx(0);
+    setConnections([]);
+    setPeer(null);
+    setOnlineStatus('idle');
+    setMobileView('map');
+  };
+
+  const handleHost = () => {
+    setOnlineStatus('connecting');
+    const newPeer = new Peer();
+    newPeer.on('open', (id: string) => {
+      setRoomId(id);
+      setIsHost(true);
+      isHostRef.current = true;
+      setMyPlayerId(0);
+      setOnlineStatus('lobby');
+      setPeer(newPeer);
+    });
+    newPeer.on('connection', (conn: any) => {
+      setConnections(prev => {
+        const next = [...prev, conn];
+        connectionsRef.current = next;
+        return next;
+      });
+      conn.on('data', (data: any) => handleIncomingData(data, conn));
+    });
+  };
+
+  const handleJoin = () => {
+    setOnlineStatus('connecting');
+    const newPeer = new Peer();
+    newPeer.on('open', () => {
+      setPeer(newPeer);
+      const conn = newPeer.connect(joinId);
+      conn.on('open', () => {
+        setConnections([conn]);
+        connectionsRef.current = [conn];
+        setIsHost(false);
+        isHostRef.current = false;
+        setOnlineStatus('lobby');
+      });
+      conn.on('data', (data: any) => handleIncomingData(data));
+    });
+  };
+
+  const handleIncomingData = (data: any, conn?: any) => {
+    if (data.type === 'SYNC_STATE') {
+      const p = data.payload.players.map(deserializePlayer);
+      const g = data.payload.grid;
+      const ci = data.payload.currentIdx;
+      const turn = data.payload.turn;
+      const ph = data.payload.phase;
+      const lg = data.payload.logs;
+
+      setPlayers(p);
+      setGrid(g);
+      setCurrentIdx(ci);
+      setGameTurn(turn);
+      setPhase(ph);
+      setLogs(lg);
+      setUiState('game');
+
+      if (isHostRef.current) {
+        connectionsRef.current.forEach(c => { if (c !== conn) c.send(data); });
+      }
+    } else if (data.type === 'START_GAME') {
+        setMyPlayerId(data.myId);
+        setUiState('game');
+    }
+  };
+
+  const Hero = () => (
+    <section className="relative min-h-screen flex flex-col items-center justify-center p-8 overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(59,130,246,0.1),transparent)]" />
+      <div className="max-w-4xl text-center space-y-8 relative z-10 animate-in fade-in slide-in-from-bottom-12 duration-1000">
+        <h4 className="text-yellow-500 font-black tracking-[0.4em] uppercase text-sm mb-4">{t('tagline')}</h4>
+        <h1 className="text-6xl md:text-9xl font-black leading-none tracking-tighter">{t('heroTitle')}</h1>
+        <p className="text-slate-400 text-lg md:text-2xl max-w-2xl mx-auto leading-relaxed">{t('heroDesc')}</p>
+        <div className="pt-8 flex flex-col sm:flex-row items-center justify-center gap-6">
+          <button onClick={() => { setMode('local'); proceedToConfig(); }} className="w-full sm:w-auto px-12 py-6 bg-white text-slate-950 rounded-full font-black text-xl hover:scale-105 transition-all shadow-2xl active:scale-95 flex items-center justify-center gap-3">
+            {t('playNow')} <Play className="w-6 h-6" fill="currentColor" />
+          </button>
+          <button onClick={() => { setMode('online'); setUiState('online_setup'); }} className="w-full sm:w-auto px-12 py-6 bg-slate-900 border border-slate-700 rounded-full font-bold text-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3">
+            {t('playOnline')} <Globe className="w-6 h-6" />
+          </button>
+        </div>
+      </div>
+      <div className="absolute bottom-12 animate-bounce opacity-30"><ChevronDown className="w-8 h-8" /></div>
+    </section>
+  );
+
   const renderGrid = useMemo(() => grid.map((row, y) => (
-    <div key={y} className="flex">
+    <div key={y} className="flex flex-nowrap shrink-0">
       {row.map((cell, x) => {
         const isSelectable = selectableCells.has(`${y},${x}`);
         const ownerColor = cell.owner !== null && players[cell.owner] ? players[cell.owner].color : 'transparent';
@@ -819,7 +898,7 @@ const App: React.FC = () => {
               borderBottom: borders.bottom ? '2px solid rgba(0,0,0,0.5)' : undefined,
               borderLeft: borders.left ? '2px solid rgba(0,0,0,0.5)' : undefined,
             }}
-            className={`w-7 h-7 sm:w-8 sm:h-8 border border-slate-700/50 flex items-center justify-center text-[10px] sm:text-xs font-bold cursor-pointer rounded-sm
+            className={`w-10 h-10 sm:w-12 sm:h-12 border border-slate-700/50 flex items-center justify-center text-[10px] sm:text-xs font-bold cursor-pointer rounded-sm shrink-0 cell-transition
               ${isSelectable ? 'selectable-pulse border-white shadow-lg' : ''}
               ${cell.type === 'capital' ? 'ring-1 ring-yellow-400 shadow-lg shadow-yellow-500/20' : ''}
               ${cell.owner === null ? 'bg-slate-800' : ''}`}
@@ -832,50 +911,6 @@ const App: React.FC = () => {
     </div>
   )), [grid, selectableCells, players, gridSize]);
 
-  // Premium Landing Sections
-  const Hero = () => (
-    <section className="relative min-h-screen flex flex-col items-center justify-center p-8 overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(59,130,246,0.1),transparent)]" />
-      <div className="max-w-4xl text-center space-y-8 relative z-10 animate-in fade-in slide-in-from-bottom-12 duration-1000">
-        <h4 className="text-yellow-500 font-black tracking-[0.4em] uppercase text-sm mb-4">{t('tagline')}</h4>
-        <h1 className="text-6xl md:text-9xl font-black leading-none tracking-tighter">{t('heroTitle')}</h1>
-        <p className="text-slate-400 text-lg md:text-2xl max-w-2xl mx-auto leading-relaxed">{t('heroDesc')}</p>
-        <div className="pt-8 flex flex-col sm:flex-row items-center justify-center gap-6">
-          <button onClick={() => { setMode('local'); proceedToConfig(); }} className="w-full sm:w-auto px-12 py-6 bg-white text-slate-950 rounded-full font-black text-xl hover:scale-105 transition-all shadow-2xl active:scale-95 flex items-center justify-center gap-3">
-            {t('playNow')} <Play className="w-6 h-6" fill="currentColor" />
-          </button>
-          <button onClick={() => { setMode('online'); setUiState('online_setup'); }} className="w-full sm:w-auto px-12 py-6 bg-slate-900 border border-slate-700 rounded-full font-bold text-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3">
-            {t('playOnline')} <Globe className="w-6 h-6" />
-          </button>
-        </div>
-      </div>
-      <div className="absolute bottom-12 animate-bounce opacity-30"><ChevronDown className="w-8 h-8" /></div>
-    </section>
-  );
-
-  const FeatureSection = () => (
-    <section className="py-32 px-8 bg-slate-900/30">
-      <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-12">
-        <FeatureCard icon={<Sparkles className="text-yellow-400" />} title={t('f1')} desc={t('f1d')} />
-        <FeatureCard icon={<Sword className="text-red-400" />} title={t('f2')} desc={t('f2d')} />
-        <FeatureCard icon={<Bird className="text-cyan-400" />} title={t('f3')} desc={t('f3d')} />
-      </div>
-    </section>
-  );
-
-  const GuideSection = () => (
-    <section className="py-32 px-8">
-      <div className="max-w-5xl mx-auto space-y-24">
-        <div className="text-center space-y-4"><h2 className="text-5xl font-black">{t('howToTitle')}</h2><p className="text-slate-500 font-bold">Master the art of rule.</p></div>
-        <div className="grid gap-12">
-          <GuideStep num="01" title={t('step1')} desc={t('step1d')} icon={<Landmark className="text-yellow-500" />} />
-          <GuideStep num="02" title={t('step2')} desc={t('step2d')} icon={<MapIcon className="text-blue-500" />} />
-          <GuideStep num="03" title={t('step3')} desc={t('step3d')} icon={<Trophy className="text-emerald-500" />} />
-        </div>
-      </div>
-    </section>
-  );
-
   if (uiState === 'landing') {
     return (
       <div className="min-h-screen bg-slate-950 text-white overflow-x-hidden scroll-smooth">
@@ -887,8 +922,23 @@ const App: React.FC = () => {
           </div>
         </nav>
         <Hero />
-        <FeatureSection />
-        <GuideSection />
+        <section className="py-32 px-8 bg-slate-900/30">
+          <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-12">
+            <FeatureCard icon={<Sparkles className="text-yellow-400" />} title={t('f1')} desc={t('f1d')} />
+            <FeatureCard icon={<Sword className="text-red-400" />} title={t('f2')} desc={t('f2d')} />
+            <FeatureCard icon={<Bird className="text-cyan-400" />} title={t('f3')} desc={t('f3d')} />
+          </div>
+        </section>
+        <section className="py-32 px-8">
+          <div className="max-w-5xl mx-auto space-y-24">
+            <div className="text-center space-y-4"><h2 className="text-5xl font-black">{t('howToTitle')}</h2><p className="text-slate-500 font-bold">Master the art of rule.</p></div>
+            <div className="grid gap-12">
+              <GuideStep num="01" title={t('step1')} desc={t('step1d')} icon={<Landmark className="text-yellow-500" />} />
+              <GuideStep num="02" title={t('step2')} desc={t('step2d')} icon={<MapIcon className="text-blue-500" />} />
+              <GuideStep num="03" title={t('step3')} desc={t('step3d')} icon={<Trophy className="text-emerald-500" />} />
+            </div>
+          </div>
+        </section>
         <footer className="py-24 border-t border-slate-900 text-center space-y-8">
           <div className="flex justify-center gap-8 opacity-40 hover:opacity-100 transition-all">
             <Github className="w-6 h-6" /> <Twitter className="w-6 h-6" /> <MessageSquare className="w-6 h-6" />
@@ -971,18 +1021,15 @@ const App: React.FC = () => {
     );
   }
 
-  // GAME UI
   return (
     <div className="flex h-screen bg-slate-950 overflow-hidden relative text-white flex-col lg:flex-row">
-      {/* HUD Message Overlay */}
       {message && (
         <div className="absolute top-8 left-1/2 -translate-x-1/2 z-[100] px-8 py-4 bg-yellow-500 text-slate-950 font-black text-lg rounded-full shadow-2xl animate-bounce flex items-center gap-4 border-4 border-white/20">
           <Landmark className="w-6 h-6" /> {message}
         </div>
       )}
 
-      {/* Desktop Sidebar (Left) */}
-      <aside className="hidden lg:flex w-72 bg-slate-900/40 backdrop-blur-3xl border-r border-white/5 flex-col z-20">
+      <aside className="hidden lg:flex w-72 bg-slate-900/40 backdrop-blur-3xl border-r border-white/5 flex-col z-20 shrink-0">
         <div className="p-8 border-b border-white/5 flex items-center gap-3"><Landmark className="w-6 h-6 text-yellow-500" /><h1 className="font-black tracking-tighter uppercase text-2xl">{t('title')}</h1></div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
            <CivilizationIntel players={players} currentIdx={currentIdx} gameTurn={gameTurn} grid={grid} t={t} getPlayerScore={getPlayerScore} myPlayerId={myPlayerId} mode={mode} />
@@ -990,9 +1037,7 @@ const App: React.FC = () => {
         <div className="p-4 bg-slate-950/50 border-t border-white/5 flex justify-between items-center text-[10px] font-black uppercase text-slate-500 tracking-widest"><span>Year {gameTurn}</span><button onClick={resetToLanding} className="hover:text-white transition-all"><RotateCcw className="w-4 h-4"/></button></div>
       </aside>
 
-      {/* Main Gameplay */}
       <section className="flex-1 flex flex-col relative overflow-hidden">
-        {/* Mobile Nav */}
         <div className="lg:hidden flex bg-slate-900/80 backdrop-blur-xl border-b border-white/5 px-6 py-4 justify-between items-center z-50">
            <div className="flex items-center gap-2 font-black tracking-tighter uppercase text-sm"><Landmark className="w-5 h-5 text-yellow-500" /> {t('title')}</div>
            <div className="flex gap-2">
@@ -1002,18 +1047,18 @@ const App: React.FC = () => {
            </div>
         </div>
 
-        {/* View Content */}
         <div className="flex-1 relative overflow-hidden flex flex-col">
-          <div className={`flex-1 items-center justify-center p-8 overflow-auto z-10 ${mobileView === 'map' ? 'flex' : 'hidden lg:flex'}`}>
-            <div className="bg-slate-900/50 p-6 rounded-[2rem] border border-white/5 shadow-2xl backdrop-blur-md">
-               {renderGrid}
+          <div className={`flex-1 overflow-auto touch-pan-x touch-pan-y z-10 scrollbar-hide ${mobileView === 'map' ? 'block' : 'hidden lg:block'}`}>
+            <div className="min-h-full min-w-full flex items-center justify-center p-8 sm:p-12">
+              <div className="min-w-max bg-slate-900/50 p-6 rounded-[2rem] border border-white/5 shadow-2xl backdrop-blur-md">
+                 {renderGrid}
+              </div>
             </div>
           </div>
           {mobileView === 'status' && <div className="lg:hidden flex-1 bg-slate-950 overflow-y-auto p-6"><CivilizationIntel players={players} currentIdx={currentIdx} gameTurn={gameTurn} grid={grid} t={t} getPlayerScore={getPlayerScore} myPlayerId={myPlayerId} mode={mode} /></div>}
           {mobileView === 'logs' && <div className="lg:hidden flex-1 bg-slate-950 overflow-y-auto p-6"><LogChronicle logs={logs} players={players} t={t} /></div>}
         </div>
 
-        {/* Action HUD */}
         {phase === 'play' && mobileView === 'map' && (
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[60] flex flex-col items-center gap-4 w-full max-w-4xl px-4 animate-in slide-in-from-bottom-12 duration-500">
              {currentPlayer && (
@@ -1046,7 +1091,6 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* End Game Overlay */}
         {phase === 'end' && (
           <div className="absolute inset-0 z-[200] bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center p-8">
             <div className="max-w-xl w-full bg-slate-900 border border-white/5 rounded-[3rem] p-12 text-center space-y-8 animate-in zoom-in-95 duration-500 shadow-2xl">
@@ -1061,79 +1105,12 @@ const App: React.FC = () => {
         )}
       </section>
 
-      {/* Desktop History Log */}
-      <aside className="hidden lg:flex w-80 bg-slate-900/40 backdrop-blur-3xl border-l border-white/5 flex-col z-20">
+      <aside className="hidden lg:flex w-80 bg-slate-900/40 backdrop-blur-3xl border-l border-white/5 flex-col z-20 shrink-0">
         <div className="p-8 border-b border-white/5"><h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">{t('logs')}</h3></div>
         <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin"><LogChronicle logs={logs} players={players} t={t} /></div>
       </aside>
     </div>
   );
 };
-
-// Components
-const FeatureCard = ({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) => (
-  <div className="bg-slate-900/50 border border-white/5 p-12 rounded-[3rem] space-y-6 hover:bg-slate-800 transition-all group">
-    <div className="w-20 h-20 bg-slate-950 rounded-3xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-xl">{React.cloneElement(icon as React.ReactElement<any>, { className: "w-10 h-10" })}</div>
-    <h3 className="text-3xl font-black">{title}</h3>
-    <p className="text-slate-500 font-bold leading-relaxed">{desc}</p>
-  </div>
-);
-
-const GuideStep = ({ num, title, desc, icon }: { num: string, title: string, desc: string, icon: React.ReactNode }) => (
-  <div className="flex gap-8 items-start group">
-    <span className="text-8xl font-black text-white/5 group-hover:text-white/10 transition-colors leading-none">{num}</span>
-    <div className="space-y-4 pt-4">
-      <div className="flex items-center gap-4">{React.cloneElement(icon as React.ReactElement<any>, { className: "w-8 h-8" })}<h3 className="text-4xl font-black">{title}</h3></div>
-      <p className="text-slate-500 text-xl font-bold leading-relaxed max-w-lg">{desc}</p>
-    </div>
-  </div>
-);
-
-const HUDButton = ({ icon, label, onClick, color, disabled, active, badge }: { icon: React.ReactNode, label: string, onClick: () => void, color: string, disabled?: boolean, active?: boolean, badge?: string|null }) => {
-  const colors: any = { yellow: 'text-yellow-400', emerald: 'text-emerald-400', blue: 'text-blue-400', red: 'text-red-400', orange: 'text-orange-400', cyan: 'text-cyan-400' };
-  return (
-    <button onClick={onClick} disabled={disabled} className={`w-24 h-24 rounded-3xl flex flex-col items-center justify-center transition-all relative shrink-0 snap-center ${disabled ? 'opacity-20 grayscale cursor-not-allowed' : 'hover:bg-white/5 active:scale-90'} ${active ? 'bg-yellow-500/20 ring-2 ring-yellow-500' : ''}`}>
-      <div className={`mb-1 ${colors[color]}`}>{React.cloneElement(icon as React.ReactElement<any>, { className: "w-6 h-6" })}</div>
-      <span className="text-[9px] font-black uppercase text-slate-500 tracking-tighter text-center px-1 leading-none">{label}</span>
-      {badge && <span className="absolute top-2 right-2 bg-slate-950 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full border border-white/10">{badge}</span>}
-    </button>
-  );
-};
-
-const NavBtn = ({ active, icon, onClick }: { active: boolean, icon: React.ReactNode, onClick: () => void }) => (
-  <button onClick={onClick} className={`p-3 rounded-2xl transition-all ${active ? 'bg-yellow-500 text-slate-950 shadow-xl' : 'text-slate-500 bg-slate-950 border border-white/5'}`}>{React.cloneElement(icon as React.ReactElement<any>, { className: "w-6 h-6" })}</button>
-);
-
-const CivilizationIntel = ({ players, currentIdx, grid, t, getPlayerScore, myPlayerId, mode }: any) => (
-  <div className="space-y-4">
-    {players.map((p: Player) => {
-      const limit = 25 + p.cities.length * 10;
-      return (
-        <div key={p.id} className={`p-6 rounded-[2rem] border transition-all ${p.eliminated ? 'opacity-20 grayscale' : p.id === currentIdx ? 'bg-slate-800 border-yellow-500 shadow-2xl' : 'bg-slate-900 border-white/5'}`}>
-          <div className="flex justify-between items-center mb-4">
-            <span className="font-black text-sm flex items-center gap-2" style={{ color: p.color }}>{p.name} {mode === 'online' && myPlayerId === p.id && <Monitor className="w-3 h-3"/>}</span>
-            <div className="flex items-center gap-1 bg-slate-950 px-2 py-0.5 rounded-full text-[10px] font-black text-yellow-500 border border-white/5"><Star className="w-3 h-3"/> {getPlayerScore(p.id, players, grid)}</div>
-          </div>
-          <div className="space-y-3 opacity-80 text-[10px] font-bold">
-            <div className="flex justify-between"><span>{t('capLv', { lv: p.capitalLevel })}</span><span>{p.cities.length} {t('city')}</span></div>
-            <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden"><div className="h-full bg-yellow-500 transition-all duration-500" style={{ width: `${Math.min(100, (p.territory.size / limit) * 100)}%` }} /></div>
-            <div className="flex justify-between text-[8px] font-black text-slate-500 uppercase"><span>{t('status')}</span><span>{p.territory.size}/{limit}</span></div>
-          </div>
-        </div>
-      );
-    })}
-  </div>
-);
-
-const LogChronicle = ({ logs, players, t }: any) => (
-  <div className="space-y-3">
-    {logs.map((log: GameLogEntry, i: number) => (
-      <div key={i} className={`p-4 rounded-2xl border text-xs font-bold space-y-1 ${log.type === 'war' ? 'bg-red-950/20 border-red-900/40 text-red-300' : log.type === 'growth' ? 'bg-emerald-950/20 border-emerald-900/40 text-emerald-300' : 'bg-slate-900/50 border-white/5 text-slate-300'}`}>
-        <div className="flex justify-between items-center opacity-40 text-[9px] uppercase tracking-tighter"><span>Year {log.turn}</span>{log.playerId >= 0 && <span style={{ color: players[log.playerId]?.color }}>{players[log.playerId]?.name}</span>}</div>
-        <p className="leading-relaxed">{log.text}</p>
-      </div>
-    ))}
-  </div>
-);
 
 export default App;
