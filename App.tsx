@@ -320,7 +320,7 @@ const App: React.FC = () => {
   };
 
   const syncGameState = (updatedPlayers: Player[], updatedGrid: Cell[][], updatedCurrentIdx: number, updatedTurn: number, updatedPhase: GamePhase, updatedLogs: GameLogEntry[]) => {
-    if (mode === 'online' && isHost) {
+    if (mode === 'online') {
       const payload = {
         players: updatedPlayers.map(serializePlayer),
         grid: updatedGrid,
@@ -329,15 +329,14 @@ const App: React.FC = () => {
         phase: updatedPhase,
         logs: updatedLogs,
       };
-      connections.forEach(conn => conn.send({ type: 'SYNC_STATE', payload }));
+      const message = { type: 'SYNC_STATE', payload };
+      if (isHost) {
+        connections.forEach(conn => conn.send(message));
+      } else if (connections.length > 0) {
+        connections[0].send(message);
+      }
     }
   };
-
-  useEffect(() => {
-    if (mode === 'online' && isHost && phase === 'play') {
-      syncGameState(players, grid, currentIdx, gameTurn, phase, logs);
-    }
-  }, [currentIdx, gameTurn, phase]);
 
   const checkWinCondition = (updatedPlayers: Player[]) => {
     const techWinner = updatedPlayers.find(p => p.capitalLevel >= 10);
@@ -408,6 +407,12 @@ const App: React.FC = () => {
       setPhase(data.payload.phase);
       setLogs(data.payload.logs);
       setUiState('game');
+      // If host receives a sync from client, broadcast it to all other clients
+      if (isHost) {
+        connections.forEach(c => {
+          if (c !== conn) c.send(data);
+        });
+      }
     } else if (data.type === 'START_GAME') {
         setMyPlayerId(data.myId);
         setUiState('game');
@@ -444,6 +449,7 @@ const App: React.FC = () => {
     showMessage(t('placeCap'));
     if (mode === 'online' && isHost) {
         connections.forEach((conn, i) => conn.send({ type: 'START_GAME', myId: i + 1 }));
+        syncGameState(initialPlayers, initialGrid, 0, 1, 'setup', [{ turn: 1, playerId: -1, text: t('initLog'), type: 'info' }]);
     }
   };
 
@@ -471,6 +477,11 @@ const App: React.FC = () => {
   const nextTurn = () => {
     if (phase === 'end') return;
     if (!isMyTurn && mode === 'online') return;
+    
+    let updatedPlayersGlobal: Player[] = [];
+    let updatedTurnGlobal = gameTurn;
+    let nextIdxGlobal = 0;
+
     setPlayers(prevPlayers => {
       const updatedPlayers = [...prevPlayers];
       if (updatedPlayers.length === 0) return updatedPlayers;
@@ -501,13 +512,36 @@ const App: React.FC = () => {
         } else { newTruceTurns[enemyId] = remaining; }
       });
       p.truceTurns = newTruceTurns; p.truceWith = newTruceWith;
-      updatedPlayers[currentIdx] = p; return updatedPlayers;
+      updatedPlayers[currentIdx] = p;
+      updatedPlayersGlobal = updatedPlayers;
+      return updatedPlayers;
     });
+
     setPendingAction(null); setSelectableCells(new Set()); setExpansionRemaining(0);
+    
     let nextIdx = (currentIdx + 1) % playerCount;
-    while (players[nextIdx] && players[nextIdx].eliminated && players.some(pl => !pl.eliminated)) { nextIdx = (nextIdx + 1) % playerCount; }
-    if (nextIdx === 0) setGameTurn(prev => prev + 1);
+    // Skip eliminated players
+    const areThereSurvivors = players.some((pl, idx) => !pl.eliminated && idx !== currentIdx);
+    if (areThereSurvivors) {
+        while (players[nextIdx] && players[nextIdx].eliminated) { 
+            nextIdx = (nextIdx + 1) % playerCount; 
+        }
+    }
+    
+    nextIdxGlobal = nextIdx;
+    if (nextIdx === 0) {
+        setGameTurn(prev => {
+            updatedTurnGlobal = prev + 1;
+            return prev + 1;
+        });
+    }
+
     setCurrentIdx(nextIdx);
+    
+    // Sync after turn complete
+    setTimeout(() => {
+        syncGameState(updatedPlayersGlobal, grid, nextIdxGlobal, updatedTurnGlobal, phase, logs);
+    }, 50);
   };
 
   const claimAround = (pid: number, centerX: number, centerY: number, radius: number, playersArr: Player[], gridArr: Cell[][]) => {
@@ -538,9 +572,18 @@ const App: React.FC = () => {
       claimAround(currentIdx, x, y, 1, newPlayers, newGrid);
       newPlayers[currentIdx] = p;
       setGrid(newGrid); setPlayers(newPlayers);
-      if (currentIdx < playerCount - 1) setCurrentIdx(currentIdx + 1);
-      else { setPhase('play'); setCurrentIdx(0); addLog(-1, t('struggleStart')); }
-      syncGameState(newPlayers, newGrid, currentIdx + 1, gameTurn, currentIdx < playerCount - 1 ? 'setup' : 'play', logs);
+      
+      const isLastPlayer = currentIdx === playerCount - 1;
+      const nextPhase = isLastPlayer ? 'play' : 'setup';
+      const nextIdx = isLastPlayer ? 0 : currentIdx + 1;
+
+      if (isLastPlayer) {
+          setPhase('play');
+          addLog(-1, t('struggleStart'));
+      }
+      
+      setCurrentIdx(nextIdx);
+      syncGameState(newPlayers, newGrid, nextIdx, gameTurn, nextPhase, logs);
     } else if (phase === 'play' && pendingAction) { pendingAction(x, y); }
   };
 
@@ -566,12 +609,22 @@ const App: React.FC = () => {
       const cell = grid[y][x];
       if (cell.owner === currentIdx && cell.type === 'city') {
         if (cell.level >= currentPlayer.capitalLevel) { showMessage(t('cityLvLimit', { lv: currentPlayer.capitalLevel })); return; }
-        setGrid(prev => { const n = [...prev.map(r => [...r])]; n[y][x] = { ...n[y][x], level: n[y][x].level + 1 }; return n; });
+        const newGrid = [...grid.map(r => [...r])];
+        newGrid[y][x] = { ...newGrid[y][x], level: newGrid[y][x].level + 1 };
+        setGrid(newGrid);
         addLog(currentIdx, t('cityUpLog', { lv: cell.level + 1 })); nextTurn();
       } else if (cell.owner === null) {
         const cityId = `city_${currentPlayer.cities.length}`;
-        setGrid(prev => { const n = [...prev.map(r => [...r])]; n[y][x] = { owner: currentIdx, type: 'city', control: cityId, level: 1 }; return n; });
-        setPlayers(prev => { const n = [...prev]; const p = { ...n[currentIdx] }; p.cities = [...p.cities, { x, y, id: cityId }]; p.territory = new Set(p.territory); p.territory.add(key); n[currentIdx] = p; return n; });
+        const newGrid = [...grid.map(r => [...r])];
+        newGrid[y][x] = { owner: currentIdx, type: 'city', control: cityId, level: 1 };
+        const newPlayers = [...players];
+        const p = { ...newPlayers[currentIdx] };
+        p.cities = [...p.cities, { x, y, id: cityId }];
+        p.territory = new Set(p.territory);
+        p.territory.add(key);
+        newPlayers[currentIdx] = p;
+        setGrid(newGrid);
+        setPlayers(newPlayers);
         addLog(currentIdx, t('cityLog'), 'growth'); nextTurn();
       }
     });
@@ -601,16 +654,40 @@ const App: React.FC = () => {
       const frontier = Array.from(frontierSet);
       if (frontier.length === 0) { showMessage(t('noExpansion')); return; }
       if (frontier.length <= capacityLeft) {
-        setGrid(prev => { const n = [...prev.map(r => [...r])]; frontier.forEach(key => { const [fy, fx] = key.split(',').map(Number); n[fy][fx] = { owner: currentIdx, type: 'land', control: center.id, level: 1 }; }); return n; });
-        setPlayers(prev => { const n = [...prev]; const p = { ...n[currentIdx] }; p.territory = new Set(p.territory); frontier.forEach(key => p.territory.add(key)); n[currentIdx] = p; return n; });
+        const newGrid = [...grid.map(r => [...r])];
+        const newPlayers = [...players];
+        const p = { ...newPlayers[currentIdx] };
+        p.territory = new Set(p.territory);
+        frontier.forEach(key => {
+          const [fy, fx] = key.split(',').map(Number);
+          newGrid[fy][fx] = { owner: currentIdx, type: 'land', control: center.id, level: 1 };
+          p.territory.add(key);
+        });
+        newPlayers[currentIdx] = p;
+        setGrid(newGrid);
+        setPlayers(newPlayers);
         addLog(currentIdx, t('expandLog', { center: center.name, n: frontier.length })); nextTurn();
       } else {
         setExpansionRemaining(capacityLeft); setSelectableCells(new Set(frontier)); showMessage(t('manualExpand', { n: capacityLeft }));
         setPendingAction(() => (mx: number, my: number) => {
           const mKey = `${my},${mx}`; if (!frontierSet.has(mKey)) return;
-          setGrid(prev => { const n = [...prev.map(r => [...r])]; n[my][mx] = { owner: currentIdx, type: 'land', control: center.id, level: 1 }; return n; });
-          setPlayers(prev => { const n = [...prev]; const p = { ...n[currentIdx] }; p.territory = new Set(p.territory); p.territory.add(mKey); n[currentIdx] = p; return n; });
-          setExpansionRemaining(prev => { if (prev - 1 <= 0) { addLog(currentIdx, t('expandLog', { center: center.name, n: capacityLeft })); setTimeout(nextTurn, 100); return 0; } return prev - 1; });
+          const newGrid = [...grid.map(r => [...r])];
+          newGrid[my][mx] = { owner: currentIdx, type: 'land', control: center.id, level: 1 };
+          const newPlayers = [...players];
+          const p = { ...newPlayers[currentIdx] };
+          p.territory = new Set(p.territory);
+          p.territory.add(mKey);
+          newPlayers[currentIdx] = p;
+          setGrid(newGrid);
+          setPlayers(newPlayers);
+          setExpansionRemaining(prev => { 
+              if (prev - 1 <= 0) { 
+                  addLog(currentIdx, t('expandLog', { center: center.name, n: capacityLeft })); 
+                  setTimeout(nextTurn, 100); 
+                  return 0; 
+              } 
+              return prev - 1; 
+          });
           setSelectableCells(prev => { const ns = new Set(prev); ns.delete(mKey); return ns; });
         });
       }
@@ -627,31 +704,32 @@ const App: React.FC = () => {
     if (targets.size === 0) { showMessage(t('noEnemyInvade')); return; }
     const attackerScore = getPlayerScore(currentIdx, players, grid);
     let totalCaptured = 0;
-    setGrid(prevGrid => {
-      const nextGrid = [...prevGrid.map(r => [...r])];
-      setPlayers(prevPlayers => {
-        const nextPlayers = [...prevPlayers.map(p => ({ ...p, territory: new Set(p.territory) }))];
-        const pAttacker = nextPlayers[currentIdx];
-        targets.forEach(key => {
-          const [ty, tx] = key.split(',').map(Number); const cell = nextGrid[ty][tx]; const oldOwnerId = cell.owner!;
-          const defenderScore = getPlayerScore(oldOwnerId, nextPlayers, nextGrid);
-          const successChance = Math.max(0.05, attackerScore / (attackerScore + defenderScore));
-          if (Math.random() < successChance) {
-            totalCaptured++;
-            if (cell.type === 'capital') {
-              addLog(currentIdx, t('invadeCap', { name: nextPlayers[oldOwnerId].name }), 'war');
-              nextPlayers[oldOwnerId].eliminated = true;
-              nextGrid.forEach((row, gy) => row.forEach((c, gx) => { if (c.owner === oldOwnerId) { nextGrid[gy][gx] = { ...c, owner: currentIdx, control: 'captured' }; pAttacker.territory.add(`${gy},${gx}`); } }));
-            } else if (cell.type === 'city') {
-              const cityId = cell.control; addLog(currentIdx, t('invadeCity', { name: nextPlayers[oldOwnerId].name }), 'war');
-              nextGrid.forEach((row, gy) => row.forEach((c, gx) => { if (c.owner === oldOwnerId && c.control === cityId) { nextGrid[gy][gx] = { ...c, owner: currentIdx, control: `captured:from:${oldOwnerId}` }; pAttacker.territory.add(`${gy},${gx}`); nextPlayers[oldOwnerId].territory.delete(`${gy},${gx}`); } }));
-            } else { nextGrid[ty][tx] = { ...cell, owner: currentIdx, control: 'captured' }; pAttacker.territory.add(key); nextPlayers[oldOwnerId].territory.delete(key); }
-          }
-        });
-        checkWinCondition(nextPlayers); return nextPlayers;
-      });
-      return nextGrid;
+    
+    const nextGrid = [...grid.map(r => [...r])];
+    const nextPlayers = [...players.map(p => ({ ...p, territory: new Set(p.territory) }))];
+    const pAttacker = nextPlayers[currentIdx];
+    
+    targets.forEach(key => {
+      const [ty, tx] = key.split(',').map(Number); const cell = nextGrid[ty][tx]; const oldOwnerId = cell.owner!;
+      const defenderScore = getPlayerScore(oldOwnerId, nextPlayers, nextGrid);
+      const successChance = Math.max(0.05, attackerScore / (attackerScore + defenderScore));
+      if (Math.random() < successChance) {
+        totalCaptured++;
+        if (cell.type === 'capital') {
+          addLog(currentIdx, t('invadeCap', { name: nextPlayers[oldOwnerId].name }), 'war');
+          nextPlayers[oldOwnerId].eliminated = true;
+          nextGrid.forEach((row, gy) => row.forEach((c, gx) => { if (c.owner === oldOwnerId) { nextGrid[gy][gx] = { ...c, owner: currentIdx, control: 'captured' }; pAttacker.territory.add(`${gy},${gx}`); } }));
+        } else if (cell.type === 'city') {
+          const cityId = cell.control; addLog(currentIdx, t('invadeCity', { name: nextPlayers[oldOwnerId].name }), 'war');
+          nextGrid.forEach((row, gy) => row.forEach((c, gx) => { if (c.owner === oldOwnerId && c.control === cityId) { nextGrid[gy][gx] = { ...c, owner: currentIdx, control: `captured:from:${oldOwnerId}` }; pAttacker.territory.add(`${gy},${gx}`); nextPlayers[oldOwnerId].territory.delete(`${gy},${gx}`); } }));
+        } else { nextGrid[ty][tx] = { ...cell, owner: currentIdx, control: 'captured' }; pAttacker.territory.add(key); nextPlayers[oldOwnerId].territory.delete(key); }
+      }
     });
+
+    setGrid(nextGrid);
+    setPlayers(nextPlayers);
+    checkWinCondition(nextPlayers);
+    
     if (totalCaptured > 0) addLog(currentIdx, t('invadeSummary', { n: totalCaptured }), 'war'); else addLog(currentIdx, t('invadeFailOnly'));
     nextTurn();
   };
@@ -665,10 +743,9 @@ const App: React.FC = () => {
     setPendingAction(() => (x: number, y: number) => {
       const targetCell = grid[y][x]; if (!enemyTerritories.has(`${y},${x}`)) return;
       const targetId = targetCell.owner!;
-      setPlayers(prev => {
-        const next = [...prev]; const p1 = { ...next[currentIdx], warWith: new Set(next[currentIdx].warWith) }; const p2 = { ...next[targetId], warWith: new Set(next[targetId].warWith) };
-        p1.warWith.add(targetId); p2.warWith.add(currentIdx); next[currentIdx] = p1; next[targetId] = p2; return next;
-      });
+      const next = [...players]; const p1 = { ...next[currentIdx], warWith: new Set(next[currentIdx].warWith) }; const p2 = { ...next[targetId], warWith: new Set(next[targetId].warWith) };
+      p1.warWith.add(targetId); p2.warWith.add(currentIdx); next[currentIdx] = p1; next[targetId] = p2;
+      setPlayers(next);
       addLog(currentIdx, t('warLog', { name: players[targetId].name }), 'war'); nextTurn();
     });
   };
@@ -908,11 +985,10 @@ const App: React.FC = () => {
                   <HUDButton icon={<SquareArrowUp />} label={t('growCap')} color="yellow" onClick={() => { 
                      if (!currentPlayer.capitalUpgrade) { 
                        const next = currentPlayer.capitalLevel + 1; 
-                       setPlayers(prev => { 
-                         const n = [...prev]; const p = {...n[currentIdx]}; 
-                         p.capitalUpgrade = { targetLevel: next, remaining: getUpgradeCooldown(next) }; 
-                         n[currentIdx] = p; return n; 
-                       }); 
+                       const nextPlayers = [...players]; const p = {...nextPlayers[currentIdx]}; 
+                       p.capitalUpgrade = { targetLevel: next, remaining: getUpgradeCooldown(next) }; 
+                       nextPlayers[currentIdx] = p; 
+                       setPlayers(nextPlayers);
                        addLog(currentIdx, t('capUpStart', { lv: next }), 'growth'); nextTurn(); 
                      } 
                    }} active={!!currentPlayer.capitalUpgrade} disabled={!isMyTurn} badge={currentPlayer.capitalUpgrade ? `${currentPlayer.capitalUpgrade.remaining}T` : null}/>
