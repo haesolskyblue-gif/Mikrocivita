@@ -4,7 +4,7 @@ import {
   Trophy, Shield, Sword, Swords, Map as MapIcon, 
   Building2, FastForward, Users, 
   Bird, Globe, RotateCcw, SquareArrowUp, Star, Landmark, ChevronRight, Play, Sparkles,
-  Link as LinkIcon, Copy, UserPlus, Zap, LayoutGrid, List, Github, Twitter, MessageSquare, ChevronDown, Monitor, Cpu, Handshake, XCircle, Palette, User
+  Link as LinkIcon, Copy, UserPlus, Zap, LayoutGrid, List, Github, Twitter, MessageSquare, ChevronDown, Monitor, Cpu, Handshake, XCircle, Palette, User, Settings
 } from 'lucide-react';
 import { Player, Cell, GamePhase, GameLogEntry, PlayerID, GameMode } from './types.ts';
 // @ts-ignore
@@ -288,35 +288,65 @@ const claimAround = (pid: number, x: number, y: number, radius: number, playersA
 };
 
 const HUDButton = ({ icon, label, onClick, color, disabled, active, badge }: { icon: React.ReactNode, label: string, onClick: () => void, color: string, disabled?: boolean, active?: boolean, badge?: string|null }) => {
-  const colors: any = { yellow: 'text-yellow-400', emerald: 'text-emerald-400', blue: 'text-blue-400', red: 'text-red-400', orange: 'text-orange-400', cyan: 'text-cyan-400' };
+  const colors: any = { 
+    yellow: 'text-yellow-400 group-hover:bg-yellow-400/10', 
+    emerald: 'text-emerald-400 group-hover:bg-emerald-400/10', 
+    blue: 'text-blue-400 group-hover:bg-blue-400/10', 
+    red: 'text-red-400 group-hover:bg-red-400/10', 
+    orange: 'text-orange-400 group-hover:bg-orange-400/10', 
+    cyan: 'text-cyan-400 group-hover:bg-cyan-400/10' 
+  };
   return (
-    <button onClick={onClick} disabled={disabled} className={`w-24 h-24 rounded-3xl flex flex-col items-center justify-center transition-all relative shrink-0 snap-center ${disabled ? 'opacity-20 grayscale cursor-not-allowed' : 'hover:bg-white/5 active:scale-90'} ${active ? 'bg-yellow-500/20 ring-2 ring-yellow-500' : ''}`}>
-      <div className={`mb-1 ${colors[color]}`}>{React.cloneElement(icon as React.ReactElement<any>, { className: "w-6 h-6" })}</div>
-      <span className="text-[9px] font-black uppercase text-slate-500 tracking-tighter text-center px-1 leading-none">{label}</span>
-      {badge && <span className="absolute top-2 right-2 bg-slate-950 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full border border-white/10">{badge}</span>}
+    <button 
+      onClick={onClick} 
+      disabled={disabled} 
+      className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex flex-col items-center justify-center transition-all relative shrink-0 snap-center group ${disabled ? 'opacity-20 grayscale cursor-not-allowed' : 'hover:scale-105 active:scale-95'} ${active ? 'bg-yellow-500/20 ring-1 ring-yellow-500/50' : 'bg-slate-900/50 border border-white/5'}`}
+    >
+      <div className={`mb-1 transition-colors ${colors[color].split(' ')[0]}`}>{React.cloneElement(icon as React.ReactElement<any>, { className: "w-5 h-5 sm:w-6 sm:h-6" })}</div>
+      <span className="text-[7px] sm:text-[9px] font-black uppercase text-slate-400 tracking-tighter text-center px-1 leading-none group-hover:text-white transition-colors">{label}</span>
+      {badge && <span className="absolute -top-1 -right-1 bg-yellow-500 text-slate-950 text-[7px] sm:text-[9px] font-black px-1.5 py-0.5 rounded-full border border-slate-950 shadow-lg">{badge}</span>}
     </button>
   );
 };
 
 const NavBtn = ({ active, icon, onClick }: { active: boolean, icon: React.ReactNode, onClick: () => void }) => (
-  <button onClick={onClick} className={`p-3 rounded-2xl transition-all ${active ? 'bg-yellow-500 text-slate-950 shadow-xl' : 'text-slate-500 bg-slate-950 border border-white/5'}`}>{React.cloneElement(icon as React.ReactElement<any>, { className: "w-6 h-6" })}</button>
+  <button 
+    onClick={onClick} 
+    className={`p-3 rounded-xl transition-all flex items-center justify-center ${active ? 'bg-yellow-500 text-slate-950 shadow-[0_0_20px_rgba(234,179,8,0.3)]' : 'text-slate-500 bg-slate-900/50 border border-white/5'}`}
+  >
+    {React.cloneElement(icon as React.ReactElement<any>, { className: "w-5 h-5" })}
+  </button>
 );
 
 const CivilizationIntel = ({ players, currentIdx, grid, t, getPlayerScore, myPlayerId, mode }: any) => (
-  <div className="space-y-4">
+  <div className="space-y-3 pb-24 lg:pb-0">
     {players.map((p: Player) => {
-      if (!p.name) return null; // Only show joined/configured players
+      if (!p.name) return null;
       const limit = 25 + (p.cities?.length || 0) * 10;
+      const territoryCount = p.territory?.size || 0;
+      const isCurrent = p.id === currentIdx;
       return (
-        <div key={p.id} className={`p-6 rounded-[2rem] border transition-all ${p.eliminated ? 'opacity-20 grayscale' : p.id === currentIdx ? 'bg-slate-800 border-yellow-500 shadow-2xl' : 'bg-slate-900 border-white/5'}`}>
-          <div className="flex justify-between items-center mb-4">
-            <span className="font-black text-sm flex items-center gap-2" style={{ color: p.color }}>{p.name} {mode === 'online' && myPlayerId === p.id && <Monitor className="w-3 h-3"/>}</span>
-            <div className="flex items-center gap-1 bg-slate-950 px-2 py-0.5 rounded-full text-[10px] font-black text-yellow-500 border border-white/5"><Star className="w-3 h-3"/> {getPlayerScore(p.id, players, grid)}</div>
+        <div key={p.id} className={`p-4 rounded-3xl border transition-all ${p.eliminated ? 'opacity-20 grayscale' : isCurrent ? 'bg-slate-800 border-yellow-500/50 shadow-xl' : 'bg-slate-900/50 border-white/5'}`}>
+          <div className="flex justify-between items-center mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
+              <span className="font-black text-xs truncate max-w-[120px]" style={{ color: p.color }}>{p.name}</span>
+              {mode === 'online' && myPlayerId === p.id && <Monitor className="w-3 h-3 text-cyan-500"/>}
+            </div>
+            <div className="flex items-center gap-1 bg-slate-950/50 px-2 py-0.5 rounded-full text-[9px] font-black text-yellow-500 border border-white/5"><Star className="w-3 h-3"/> {getPlayerScore(p.id, players, grid)}</div>
           </div>
-          <div className="space-y-3 opacity-80 text-[10px] font-bold">
-            <div className="flex justify-between"><span>{t('capLv', { lv: p.capitalLevel })}</span><span>{(p.cities?.length || 0)} {t('city')}</span></div>
-            <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden"><div className="h-full bg-yellow-500 transition-all duration-500" style={{ width: `${Math.min(100, ((p.territory?.size || 0) / limit) * 100)}%` }} /></div>
-            <div className="flex justify-between text-[8px] font-black text-slate-500 uppercase"><span>{t('status')}</span><span>{(p.territory?.size || 0)}/{limit}</span></div>
+          <div className="space-y-2">
+            <div className="flex justify-between text-[9px] font-bold text-slate-400">
+              <span>{t('capLv', { lv: p.capitalLevel })}</span>
+              <span>{(p.cities?.length || 0)} {t('city')}</span>
+            </div>
+            <div className="w-full h-1 bg-slate-950 rounded-full overflow-hidden">
+              <div className="h-full bg-yellow-500 transition-all duration-500" style={{ width: `${Math.min(100, (territoryCount / limit) * 100)}%` }} />
+            </div>
+            <div className="flex justify-between text-[7px] font-black text-slate-500 uppercase tracking-widest">
+              <span>{t('status')}</span>
+              <span>{territoryCount}/{limit}</span>
+            </div>
           </div>
         </div>
       );
@@ -325,31 +355,16 @@ const CivilizationIntel = ({ players, currentIdx, grid, t, getPlayerScore, myPla
 );
 
 const LogChronicle = ({ logs, players, t }: any) => (
-  <div className="space-y-3">
+  <div className="space-y-2 pb-24 lg:pb-0">
     {logs.map((log: GameLogEntry, i: number) => (
-      <div key={i} className={`p-4 rounded-2xl border text-xs font-bold space-y-1 ${log.type === 'war' ? 'bg-red-950/20 border-red-900/40 text-red-300' : log.type === 'growth' ? 'bg-emerald-950/20 border-emerald-900/40 text-emerald-300' : 'bg-slate-900/50 border-white/5 text-slate-300'}`}>
-        <div className="flex justify-between items-center opacity-40 text-[9px] uppercase tracking-tighter"><span>Year {log.turn}</span>{log.playerId >= 0 && <span style={{ color: players[log.playerId]?.color }}>{players[log.playerId]?.name}</span>}</div>
-        <p className="leading-relaxed">{log.text}</p>
+      <div key={i} className={`p-3 rounded-2xl border text-[10px] sm:text-xs font-bold space-y-1 ${log.type === 'war' ? 'bg-red-950/10 border-red-900/30 text-red-300' : log.type === 'growth' ? 'bg-emerald-950/10 border-emerald-900/30 text-emerald-300' : 'bg-slate-900/30 border-white/5 text-slate-400'}`}>
+        <div className="flex justify-between items-center opacity-40 text-[8px] uppercase tracking-tighter">
+          <span>{log.turn}y</span>
+          {log.playerId >= 0 && <span style={{ color: players[log.playerId]?.color }}>{players[log.playerId]?.name}</span>}
+        </div>
+        <p className="leading-tight">{log.text}</p>
       </div>
     ))}
-  </div>
-);
-
-const FeatureCard = ({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) => (
-  <div className="bg-slate-900/50 border border-white/5 p-12 rounded-[3rem] space-y-6 hover:bg-slate-800 transition-all group">
-    <div className="w-20 h-20 bg-slate-950 rounded-3xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-xl">{React.cloneElement(icon as React.ReactElement<any>, { className: "w-10 h-10" })}</div>
-    <h3 className="text-3xl font-black">{title}</h3>
-    <p className="text-slate-500 font-bold leading-relaxed">{desc}</p>
-  </div>
-);
-
-const GuideStep = ({ num, title, desc, icon }: { num: string, title: string, desc: string, icon: React.ReactNode }) => (
-  <div className="flex gap-8 items-start group">
-    <span className="text-8xl font-black text-white/5 group-hover:text-white/10 transition-colors leading-none">{num}</span>
-    <div className="space-y-4 pt-4">
-      <div className="flex items-center gap-4">{React.cloneElement(icon as React.ReactElement<any>, { className: "w-8 h-8" })}<h3 className="text-4xl font-black">{title}</h3></div>
-      <p className="text-slate-500 text-xl font-bold leading-relaxed max-w-lg">{desc}</p>
-    </div>
   </div>
 );
 
@@ -446,7 +461,7 @@ const App: React.FC = () => {
 
   const showMessage = useCallback((msg: string) => {
     setMessage(msg);
-    setTimeout(() => setMessage(null), 3500);
+    setTimeout(() => setMessage(null), 3000);
   }, []);
 
   const syncGameState = (updatedPlayers: Player[], updatedGrid: Cell[][], updatedCurrentIdx: number, updatedTurn: number, updatedPhase: GamePhase, updatedLogs: GameLogEntry[]) => {
@@ -511,7 +526,6 @@ const App: React.FC = () => {
     const initialGrid: Cell[][] = Array.from({ length: size }).map(() =>
       Array.from({ length: size }).map(() => ({ owner: null, type: null, control: null, level: 1 }))
     );
-    // Use existing lobby profiles if available, otherwise defaults
     const finalPlayers: Player[] = Array.from({ length: playerCount }).map((_, i) => ({
       id: i,
       name: players[i]?.name || (lang === 'ko' ? `문명 ${i + 1}` : `Civ ${i + 1}`),
@@ -944,25 +958,16 @@ const App: React.FC = () => {
       const turn = data.payload.turn;
       const ph = data.payload.phase;
       const lg = data.payload.logs;
-
       setPlayers(p); setGrid(g); setCurrentIdx(ci); setGameTurn(turn); setPhase(ph); setLogs(lg); setUiState('game');
       if (isHostRef.current) { connectionsRef.current.forEach(c => { if (c !== conn) c.send(data); }); }
     } else if (data.type === 'START_GAME') {
-        setMyPlayerId(data.myId);
-        setUiState('game');
+        setMyPlayerId(data.myId); setUiState('game');
     } else if (data.type === 'LOBBY_PROFILE') {
         const { id, name, color } = data.payload;
-        setPlayers(prev => {
-          const next = [...prev];
-          next[id] = { ...next[id], name, color };
-          return next;
-        });
-        if (isHostRef.current) {
-          connectionsRef.current.forEach(c => { if (c !== conn) c.send(data); });
-        }
+        setPlayers(prev => { const next = [...prev]; next[id] = { ...next[id], name, color }; return next; });
+        if (isHostRef.current) { connectionsRef.current.forEach(c => { if (c !== conn) c.send(data); }); }
     } else if (data.type === 'LOBBY_SYNC_ALL') {
-        setPlayers(data.payload.players.map(deserializePlayer));
-        setMyPlayerId(data.payload.targetId);
+        setPlayers(data.payload.players.map(deserializePlayer)); setMyPlayerId(data.payload.targetId);
     }
   };
 
@@ -1007,22 +1012,21 @@ const App: React.FC = () => {
   const resetToLanding = () => { if (peer) peer.destroy(); setUiState('landing'); setPlayers([]); setGrid([]); setPhase('setup'); setGameTurn(1); setLogs([]); setCurrentIdx(0); setConnections([]); setPeer(null); setOnlineStatus('idle'); setMobileView('map'); };
 
   const Hero = () => (
-    <section className="relative min-h-screen flex flex-col items-center justify-center p-8 overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(59,130,246,0.1),transparent)]" />
-      <div className="max-w-4xl text-center space-y-8 relative z-10 animate-in fade-in slide-in-from-bottom-12 duration-1000">
-        <h4 className="text-yellow-500 font-black tracking-[0.4em] uppercase text-sm mb-4">{t('tagline')}</h4>
-        <h1 className="text-6xl md:text-9xl font-black leading-none tracking-tighter">{t('heroTitle')}</h1>
-        <p className="text-slate-400 text-lg md:text-2xl max-w-2xl mx-auto leading-relaxed">{t('heroDesc')}</p>
-        <div className="pt-8 flex flex-col sm:flex-row items-center justify-center gap-6">
-          <button onClick={() => { setMode('local'); proceedToConfig(); }} className="w-full sm:w-auto px-12 py-6 bg-white text-slate-950 rounded-full font-black text-xl hover:scale-105 transition-all shadow-2xl active:scale-95 flex items-center justify-center gap-3">
-            {t('playNow')} <Play className="w-6 h-6" fill="currentColor" />
+    <section className="relative min-h-[90vh] flex flex-col items-center justify-center p-6 sm:p-12 overflow-hidden text-center">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(59,130,246,0.05),transparent)]" />
+      <div className="max-w-4xl space-y-6 sm:space-y-8 relative z-10 animate-in fade-in slide-in-from-bottom-12 duration-1000">
+        <h4 className="text-yellow-500 font-black tracking-[0.3em] uppercase text-[10px] sm:text-xs mb-2 sm:mb-4">{t('tagline')}</h4>
+        <h1 className="text-5xl sm:text-8xl lg:text-9xl font-black leading-none tracking-tighter drop-shadow-2xl">{t('heroTitle')}</h1>
+        <p className="text-slate-400 text-sm sm:text-lg lg:text-2xl max-w-2xl mx-auto leading-relaxed">{t('heroDesc')}</p>
+        <div className="pt-6 sm:pt-10 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
+          <button onClick={() => { setMode('local'); proceedToConfig(); }} className="w-full sm:w-auto px-10 py-5 bg-white text-slate-950 rounded-full font-black text-lg hover:scale-105 transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2">
+            {t('playNow')} <Play className="w-5 h-5" fill="currentColor" />
           </button>
-          <button onClick={() => { setMode('online'); setUiState('online_setup'); }} className="w-full sm:w-auto px-12 py-6 bg-slate-900 border border-slate-700 rounded-full font-bold text-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3">
-            {t('playOnline')} <Globe className="w-6 h-6" />
+          <button onClick={() => { setMode('online'); setUiState('online_setup'); }} className="w-full sm:w-auto px-10 py-5 bg-slate-900/80 border border-slate-700/50 rounded-full font-bold text-lg hover:bg-slate-800 transition-all backdrop-blur-md flex items-center justify-center gap-2">
+            {t('playOnline')} <Globe className="w-5 h-5" />
           </button>
         </div>
       </div>
-      <div className="absolute bottom-12 animate-bounce opacity-30"><ChevronDown className="w-8 h-8" /></div>
     </section>
   );
 
@@ -1047,15 +1051,15 @@ const App: React.FC = () => {
                 cell.control?.startsWith('city') ? shadeColor(ownerColor, 75) : 
                 shadeColor(ownerColor, 60)
               ) : undefined,
-              borderTop: borders.top ? '2px solid rgba(0,0,0,0.5)' : undefined,
-              borderRight: borders.right ? '2px solid rgba(0,0,0,0.5)' : undefined,
-              borderBottom: borders.bottom ? '2px solid rgba(0,0,0,0.5)' : undefined,
-              borderLeft: borders.left ? '2px solid rgba(0,0,0,0.5)' : undefined,
+              borderTop: borders.top ? '1.5px solid rgba(0,0,0,0.4)' : undefined,
+              borderRight: borders.right ? '1.5px solid rgba(0,0,0,0.4)' : undefined,
+              borderBottom: borders.bottom ? '1.5px solid rgba(0,0,0,0.4)' : undefined,
+              borderLeft: borders.left ? '1.5px solid rgba(0,0,0,0.4)' : undefined,
             }}
-            className={`w-10 h-10 sm:w-12 sm:h-12 border border-slate-700/50 flex items-center justify-center text-[10px] sm:text-xs font-bold cursor-pointer rounded-sm shrink-0 cell-transition
-              ${isSelectable ? 'selectable-pulse border-white shadow-lg' : ''}
-              ${cell.type === 'capital' ? 'ring-1 ring-yellow-400 shadow-lg shadow-yellow-500/20' : ''}
-              ${cell.owner === null ? 'bg-slate-800' : ''}`}
+            className={`w-8 h-8 sm:w-11 sm:h-11 border border-slate-700/30 flex items-center justify-center text-[8px] sm:text-xs font-black cursor-pointer rounded-sm shrink-0 transition-all duration-200
+              ${isSelectable ? 'selectable-pulse border-white shadow-lg z-10' : ''}
+              ${cell.type === 'capital' ? 'ring-1 ring-yellow-400/50 shadow-lg shadow-yellow-500/10' : ''}
+              ${cell.owner === null ? 'bg-slate-900/40' : ''}`}
           >
             {cell.type === 'capital' && cell.owner !== null && players[cell.owner] && <span className="text-yellow-950">{players[cell.owner].capitalLevel}</span>}
             {cell.type === 'city' && <span className="opacity-80 text-white">{cell.level}</span>}
@@ -1067,90 +1071,77 @@ const App: React.FC = () => {
 
   if (uiState === 'landing') {
     return (
-      <div className="min-h-screen bg-slate-950 text-white overflow-x-hidden scroll-smooth">
-        <nav className="fixed top-0 w-full p-6 flex justify-between items-center z-[100] backdrop-blur-xl border-b border-white/5">
-          <div className="flex items-center gap-3"><Landmark className="w-8 h-8 text-yellow-500" /><span className="text-2xl font-black tracking-tighter uppercase">{t('title')}</span></div>
+      <div className="min-h-screen bg-slate-950 text-white overflow-x-hidden scroll-smooth selection:bg-yellow-500 selection:text-slate-950">
+        <nav className="fixed top-0 w-full p-4 sm:p-6 flex justify-between items-center z-[100] backdrop-blur-xl border-b border-white/5">
+          <div className="flex items-center gap-2"><Landmark className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-500" /><span className="text-lg sm:text-2xl font-black tracking-tighter uppercase">{t('title')}</span></div>
           <div className="flex gap-4">
-             <button onClick={() => setLang('en')} className={`text-sm font-black transition-all ${lang === 'en' ? 'text-yellow-500' : 'text-slate-500'}`}>EN</button>
-             <button onClick={() => setLang('ko')} className={`text-sm font-black transition-all ${lang === 'ko' ? 'text-yellow-500' : 'text-slate-500'}`}>KO</button>
+             <button onClick={() => setLang('en')} className={`text-xs sm:text-sm font-black transition-all ${lang === 'en' ? 'text-yellow-500' : 'text-slate-500'}`}>EN</button>
+             <button onClick={() => setLang('ko')} className={`text-xs sm:text-sm font-black transition-all ${lang === 'ko' ? 'text-yellow-500' : 'text-slate-500'}`}>KO</button>
           </div>
         </nav>
         <Hero />
-        <section className="py-32 px-8 bg-slate-900/30">
-          <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-12">
-            <FeatureCard icon={<Sparkles className="text-yellow-400" />} title={t('f1')} desc={t('f1d')} />
-            <FeatureCard icon={<Sword className="text-red-400" />} title={t('f2')} desc={t('f2d')} />
-            <FeatureCard icon={<Bird className="text-cyan-400" />} title={t('f3')} desc={t('f3d')} />
-          </div>
-        </section>
-        <footer className="py-24 border-t border-slate-900 text-center text-slate-600 font-bold text-sm">© 2024 MIKROCIVITA. ALL RIGHTS RESERVED.</footer>
       </div>
     );
   }
 
   if (uiState === 'online_setup') {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-8 text-white">
-        <div className="max-w-4xl w-full space-y-8">
-          <div className="text-center space-y-4">
-            <Globe className="w-16 h-16 mx-auto text-cyan-400 animate-pulse" />
-            <h2 className="text-5xl font-black uppercase tracking-tighter">{t('multiplayer')}</h2>
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 sm:p-8 text-white">
+        <div className="max-w-4xl w-full space-y-6 sm:space-y-8">
+          <div className="text-center space-y-2">
+            <Globe className="w-12 h-12 sm:w-16 sm:h-16 mx-auto text-cyan-400 animate-pulse" />
+            <h2 className="text-3xl sm:text-5xl font-black uppercase tracking-tighter">{t('multiplayer')}</h2>
           </div>
           {onlineStatus === 'idle' ? (
-            <div className="grid md:grid-cols-2 gap-6">
-              <button onClick={handleHost} className="p-8 bg-slate-900 border border-slate-800 rounded-3xl hover:bg-slate-800 transition-all text-left space-y-4 group">
-                <UserPlus className="w-10 h-10 text-yellow-500 group-hover:scale-110 transition-transform" />
-                <div><h3 className="text-2xl font-bold">{t('createRoom')}</h3><p className="text-slate-500 text-sm">Forge a new world arena.</p></div>
+            <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
+              <button onClick={handleHost} className="p-6 sm:p-8 bg-slate-900/80 border border-slate-800 rounded-3xl hover:bg-slate-800 transition-all text-left space-y-4 group">
+                <UserPlus className="w-8 h-8 sm:w-10 sm:h-10 text-yellow-500 group-hover:scale-110 transition-transform" />
+                <div><h3 className="text-xl sm:text-2xl font-bold">{t('createRoom')}</h3><p className="text-slate-500 text-xs sm:text-sm">Forge a new world arena.</p></div>
               </button>
-              <div className="p-8 bg-slate-900 border border-slate-800 rounded-3xl space-y-4">
-                <LinkIcon className="w-10 h-10 text-cyan-500" />
-                <input value={joinId} onChange={e => setJoinId(e.target.value)} placeholder={t('roomID')} className="w-full bg-slate-950 border border-slate-800 p-4 rounded-xl font-bold outline-none focus:ring-2 ring-cyan-500/50" />
-                <button onClick={handleJoin} className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 rounded-xl font-black transition-all">{t('joinRoom')}</button>
+              <div className="p-6 sm:p-8 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-4">
+                <LinkIcon className="w-8 h-8 sm:w-10 sm:h-10 text-cyan-500" />
+                <input value={joinId} onChange={e => setJoinId(e.target.value)} placeholder={t('roomID')} className="w-full bg-slate-950 border border-slate-800 p-3 sm:p-4 rounded-xl font-bold outline-none focus:ring-2 ring-cyan-500/50" />
+                <button onClick={handleJoin} className="w-full py-3 sm:py-4 bg-cyan-600 hover:bg-cyan-500 rounded-xl font-black transition-all shadow-lg">{t('joinRoom')}</button>
               </div>
             </div>
           ) : onlineStatus === 'connecting' ? (
-            <div className="text-center py-12 space-y-4"><div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" /><p className="font-bold text-slate-500">{t('connecting')}</p></div>
+            <div className="text-center py-12 space-y-4"><div className="w-10 h-10 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" /><p className="font-bold text-slate-500">{t('connecting')}</p></div>
           ) : (
-            <div className="grid lg:grid-cols-5 gap-8">
-              <div className="lg:col-span-3 space-y-8 bg-slate-900 border border-slate-800 p-8 rounded-[3rem]">
-                <div className="flex justify-between items-center">
-                  <div className="space-y-1"><span className="text-[10px] font-black uppercase text-slate-500">Room Code</span><div className="flex items-center gap-3"><span className="text-3xl font-mono font-black text-cyan-400">{roomId || joinId}</span><button onClick={() => { navigator.clipboard.writeText(roomId || joinId); showMessage('Copied!'); }}><Copy className="w-5 h-5 text-slate-500" /></button></div></div>
-                  <div className="bg-slate-950 px-4 py-2 rounded-2xl border border-slate-800"><span className="text-[10px] block font-black text-slate-500">{t('youAre')}</span><span className="font-black text-sm">{isHost ? t('host') : t('client')}</span></div>
+            <div className="grid lg:grid-cols-5 gap-6 sm:gap-8">
+              <div className="lg:col-span-3 space-y-6 sm:space-y-8 bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-6 sm:p-8 rounded-[2rem] sm:rounded-[3rem]">
+                <div className="flex flex-wrap gap-4 justify-between items-end">
+                  <div className="space-y-1"><span className="text-[10px] font-black uppercase text-slate-500">Room Code</span><div className="flex items-center gap-3"><span className="text-2xl sm:text-3xl font-mono font-black text-cyan-400">{roomId || joinId}</span><button onClick={() => { navigator.clipboard.writeText(roomId || joinId); showMessage('Copied!'); }}><Copy className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500" /></button></div></div>
+                  <div className="bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800"><span className="text-[8px] block font-black text-slate-500 uppercase tracking-widest">{t('youAre')}</span><span className="font-black text-xs sm:text-sm">{isHost ? t('host') : t('client')}</span></div>
                 </div>
-                <div className="space-y-6 pt-8 border-t border-slate-800">
-                  <div className="flex items-center gap-3"><User className="text-yellow-500 w-6 h-6" /><h4 className="font-black uppercase tracking-widest text-sm">{t('lobbyEdit')}</h4></div>
-                  <div className="space-y-4">
-                    <input value={players[myPlayerId!]?.name || ''} onChange={e => updateProfile(e.target.value, players[myPlayerId!]?.color)} placeholder={t('namePlace')} className="w-full bg-slate-950 border border-slate-800 p-4 rounded-xl font-bold outline-none ring-yellow-500/30 focus:ring-2" />
-                    <div className="flex gap-2 flex-wrap">{DEFAULT_COLORS.map(c => <button key={c} onClick={() => updateProfile(players[myPlayerId!]?.name, c)} style={{ backgroundColor: c }} className={`w-10 h-10 rounded-xl border-2 transition-all ${players[myPlayerId!]?.color === c ? 'border-white scale-110 shadow-lg' : 'border-transparent opacity-40'}`} />)}</div>
-                  </div>
+                <div className="space-y-4 pt-6 border-t border-slate-800/50">
+                  <div className="flex items-center gap-2 text-yellow-500"><User className="w-4 h-4 sm:w-5 sm:h-5" /><h4 className="font-black uppercase tracking-widest text-[10px] sm:text-xs">{t('lobbyEdit')}</h4></div>
+                  <input value={players[myPlayerId!]?.name || ''} onChange={e => updateProfile(e.target.value, players[myPlayerId!]?.color)} placeholder={t('namePlace')} className="w-full bg-slate-950 border border-slate-800 p-3 sm:p-4 rounded-xl font-bold outline-none ring-yellow-500/30 focus:ring-2 transition-all" />
+                  <div className="flex gap-2 flex-wrap">{DEFAULT_COLORS.map(c => <button key={c} onClick={() => updateProfile(players[myPlayerId!]?.name, c)} style={{ backgroundColor: c }} className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl border-2 transition-all ${players[myPlayerId!]?.color === c ? 'border-white scale-110 shadow-lg' : 'border-transparent opacity-40 hover:opacity-100'}`} />)}</div>
                 </div>
                 {isHost && (
-                  <div className="pt-8 space-y-6 border-t border-slate-800">
-                    <div className="flex items-center justify-center gap-4">
-                      <span className="font-bold text-slate-400">{t('players')}</span>
-                      {[2,3,4].map(n => <button key={n} onClick={() => setPlayerCount(n)} className={`w-12 h-12 rounded-xl font-black ${playerCount === n ? 'bg-yellow-500 text-slate-950' : 'bg-slate-800 text-slate-500'}`}>{n}</button>)}
+                  <div className="pt-6 space-y-6 border-t border-slate-800/50">
+                    <div className="flex items-center justify-center gap-3">
+                      <span className="font-bold text-slate-400 text-sm">{t('players')}</span>
+                      {[2,3,4].map(n => <button key={n} onClick={() => setPlayerCount(n)} className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl font-black transition-all ${playerCount === n ? 'bg-yellow-500 text-slate-950' : 'bg-slate-800 text-slate-500'}`}>{n}</button>)}
                     </div>
-                    <button onClick={initGameGrid} disabled={players.filter(p => p.name).length < playerCount} className="w-full py-6 bg-yellow-500 text-slate-950 font-black text-2xl rounded-3xl disabled:opacity-20">{t('start')}</button>
+                    <button onClick={initGameGrid} disabled={players.filter(p => p.name).length < playerCount} className="w-full py-4 sm:py-6 bg-yellow-500 text-slate-950 font-black text-xl sm:text-2xl rounded-2xl sm:rounded-3xl disabled:opacity-20 shadow-xl transition-all active:scale-[0.98]">{t('start')}</button>
                   </div>
                 )}
               </div>
-              <div className="lg:col-span-2 bg-slate-900 border border-slate-800 p-8 rounded-[3rem] space-y-6">
-                <h4 className="text-xs font-black text-slate-500 flex items-center gap-2 uppercase tracking-widest"><Users className="w-4 h-4" /> Enrolled Empires</h4>
-                <div className="space-y-3">
+              <div className="lg:col-span-2 bg-slate-900/50 backdrop-blur-lg border border-slate-800 p-6 sm:p-8 rounded-[2rem] sm:rounded-[3rem] space-y-6">
+                <h4 className="text-[10px] sm:text-xs font-black text-slate-500 flex items-center gap-2 uppercase tracking-widest"><Users className="w-4 h-4" /> Enrolled Empires</h4>
+                <div className="space-y-3 overflow-y-auto max-h-[300px] scrollbar-hide">
                   {players.map((p, i) => p.name ? (
-                    <div key={i} className="flex items-center justify-between p-4 bg-slate-950 rounded-2xl border border-white/5">
-                      <div className="flex items-center gap-3"><div className="w-4 h-4 rounded-full" style={{ backgroundColor: p.color }} /><span className="font-black text-sm">{p.name} {i === 0 && <span className="text-[10px] text-yellow-500 opacity-50 ml-1">(HOST)</span>}</span></div>
+                    <div key={i} className="flex items-center justify-between p-3 bg-slate-950/50 rounded-2xl border border-white/5">
+                      <div className="flex items-center gap-3"><div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} /><span className="font-black text-xs sm:text-sm truncate">{p.name} {i === 0 && <span className="text-[8px] text-yellow-500 opacity-50 ml-1 uppercase">(HOST)</span>}</span></div>
                       {myPlayerId === i && <Monitor className="w-4 h-4 text-cyan-500" />}
                     </div>
                   ) : null)}
-                  {Array.from({ length: Math.max(0, playerCount - players.filter(p => p.name).length) }).map((_, i) => (
-                    <div key={`wait-${i}`} className="p-4 border border-dashed border-slate-800 rounded-2xl text-center text-[10px] font-black text-slate-700 uppercase tracking-widest animate-pulse">Waiting for empire...</div>
-                  ))}
                 </div>
               </div>
             </div>
           )}
-          <button onClick={resetToLanding} className="w-full text-slate-600 font-bold hover:text-white transition-all">{t('reset')}</button>
+          <button onClick={resetToLanding} className="w-full text-slate-600 font-bold hover:text-white transition-all text-sm uppercase tracking-widest">{t('reset')}</button>
         </div>
       </div>
     );
@@ -1158,19 +1149,19 @@ const App: React.FC = () => {
 
   if (uiState === 'config') {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-8 text-white">
-        <div className="max-w-4xl w-full space-y-12">
-          <div className="text-center space-y-2"><h2 className="text-5xl font-black tracking-tight">{t('customize')}</h2><p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Configure your empire</p></div>
-          <div className="grid md:grid-cols-2 gap-4">
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 sm:p-8 text-white">
+        <div className="max-w-4xl w-full space-y-8 sm:space-y-12">
+          <div className="text-center space-y-2"><h2 className="text-3xl sm:text-5xl font-black tracking-tight">{t('customize')}</h2><p className="text-slate-500 font-black uppercase tracking-widest text-[10px] sm:text-xs">Configure local match</p></div>
+          <div className="grid sm:grid-cols-2 gap-4">
             {players.map((p, idx) => (
-              <div key={idx} className="bg-slate-900/50 border border-slate-800 p-6 rounded-[2rem] space-y-4">
-                <div className="flex justify-between items-center"><span className="text-[10px] font-black text-slate-500">Empire {idx+1}</span><div className="w-5 h-5 rounded-full" style={{ backgroundColor: p.color }} /></div>
-                <input value={p.name} onChange={e => { const n = [...players]; n[idx].name = e.target.value; setPlayers(n); }} placeholder={t('namePlace')} className="w-full bg-slate-950 border border-slate-800 p-4 rounded-xl font-bold outline-none ring-yellow-500/30 focus:ring-2" />
-                <div className="flex gap-2 flex-wrap">{DEFAULT_COLORS.map(c => <button key={c} onClick={() => { const n = [...players]; n[idx].color = c; setPlayers(n); }} style={{ backgroundColor: c }} className={`w-8 h-8 rounded-lg border-2 transition-all ${p.color === c ? 'border-white scale-110 shadow-lg' : 'border-transparent opacity-40 hover:opacity-100'}`} />)}</div>
+              <div key={idx} className="bg-slate-900/50 border border-slate-800 p-5 rounded-[2rem] space-y-4">
+                <div className="flex justify-between items-center"><span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Empire {idx+1}</span><div className="w-4 h-4 rounded-full" style={{ backgroundColor: p.color }} /></div>
+                <input value={p.name} onChange={e => { const n = [...players]; n[idx].name = e.target.value; setPlayers(n); }} placeholder={t('namePlace')} className="w-full bg-slate-950 border border-slate-800 p-3 sm:p-4 rounded-xl font-bold outline-none ring-yellow-500/30 focus:ring-2" />
+                <div className="flex gap-2 flex-wrap">{DEFAULT_COLORS.map(c => <button key={c} onClick={() => { const n = [...players]; n[idx].color = c; setPlayers(n); }} style={{ backgroundColor: c }} className={`w-8 h-8 rounded-lg border-2 transition-all ${p.color === c ? 'border-white scale-110' : 'border-transparent opacity-40 hover:opacity-100'}`} />)}</div>
               </div>
             ))}
           </div>
-          <button onClick={initGameGrid} className="w-full py-6 bg-yellow-500 text-slate-950 font-black text-3xl rounded-3xl shadow-2xl hover:bg-yellow-400 active:scale-95 transition-all">{t('start')}</button>
+          <button onClick={initGameGrid} className="w-full py-5 bg-yellow-500 text-slate-950 font-black text-2xl sm:text-3xl rounded-3xl shadow-2xl hover:bg-yellow-400 active:scale-95 transition-all">{t('start')}</button>
         </div>
       </div>
     );
@@ -1179,43 +1170,45 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen bg-slate-950 overflow-hidden relative text-white flex-col lg:flex-row">
       {message && (
-        <div className="absolute top-8 left-1/2 -translate-x-1/2 z-[100] px-8 py-4 bg-yellow-500 text-slate-950 font-black text-lg rounded-full shadow-2xl animate-bounce flex items-center gap-4 border-4 border-white/20">
-          <Landmark className="w-6 h-6" /> {message}
+        <div className="fixed top-20 sm:top-8 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 bg-yellow-500 text-slate-950 font-black text-xs sm:text-sm rounded-full shadow-2xl animate-in slide-in-from-top-4 flex items-center gap-3 border border-white/20 whitespace-nowrap">
+          <Landmark className="w-4 h-4" /> {message}
         </div>
       )}
 
-      {isMyTurn && pendingTruceTarget !== null && (
-        <div className="absolute inset-0 z-[150] bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-8">
-           <div className="max-w-md w-full bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 space-y-8 animate-in zoom-in-95 duration-300 shadow-2xl">
-              <div className="text-center space-y-4">
-                 <Handshake className="w-16 h-16 mx-auto text-cyan-400" />
-                 <h2 className="text-3xl font-black">{t('forceTruceTitle')}</h2>
-                 <p className="text-slate-400 font-bold">{t('forceTruceDesc', { name: players[pendingTruceTarget]?.name })}</p>
-              </div>
-              <div className="flex flex-col gap-3">
-                 <button onClick={() => { const nextP = establishTruce(currentIdx, pendingTruceTarget, players); const nextLogs = addLog(currentIdx, t('truceForcedLog', { name: players[pendingTruceTarget].name }), 'peace'); nextTurn(grid, nextP, nextLogs); }} className="w-full py-4 bg-cyan-600 text-white font-black rounded-2xl hover:bg-cyan-500 transition-all shadow-xl">{t('forceTruceAction')}</button>
-                 <button onClick={() => nextTurn(grid, players, logs)} className="w-full py-4 bg-slate-800 text-slate-400 font-bold rounded-2xl hover:bg-slate-700 transition-all">{t('continueWar')}</button>
-              </div>
+      {/* Diplomatic & Forced Treaty Modals optimized for Mobile */}
+      {isMyTurn && (pendingTruceTarget !== null || (currentPlayer?.truceProposals?.size || 0) > 0) && (
+        <div className="fixed inset-0 z-[250] bg-slate-950/80 backdrop-blur-2xl flex items-center justify-center p-6">
+           <div className="max-w-md w-full bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 space-y-6 sm:space-y-8 animate-in zoom-in-95 duration-300 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+              {pendingTruceTarget !== null ? (
+                <>
+                  <div className="text-center space-y-4">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-cyan-500/10 rounded-full flex items-center justify-center mx-auto"><Handshake className="w-8 h-8 sm:w-10 sm:h-10 text-cyan-400" /></div>
+                    <h2 className="text-2xl sm:text-3xl font-black">{t('forceTruceTitle')}</h2>
+                    <p className="text-slate-400 text-sm font-bold leading-relaxed">{t('forceTruceDesc', { name: players[pendingTruceTarget]?.name })}</p>
+                  </div>
+                  <div className="flex flex-col gap-3 pt-2">
+                    <button onClick={() => { const nextP = establishTruce(currentIdx, pendingTruceTarget!, players); const nextLogs = addLog(currentIdx, t('truceForcedLog', { name: players[pendingTruceTarget!].name }), 'peace'); nextTurn(grid, nextP, nextLogs); }} className="w-full py-4 bg-cyan-600 text-white font-black rounded-2xl hover:bg-cyan-500 transition-all shadow-xl active:scale-95">{t('forceTruceAction')}</button>
+                    <button onClick={() => nextTurn(grid, players, logs)} className="w-full py-4 bg-slate-800 text-slate-400 font-bold rounded-2xl hover:bg-slate-700 transition-all active:scale-95">{t('continueWar')}</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-center space-y-4">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto"><Bird className="w-8 h-8 sm:w-10 sm:h-10 text-emerald-400" /></div>
+                    <h2 className="text-2xl sm:text-3xl font-black">{t('offerReceived')}</h2>
+                    <p className="text-slate-400 text-sm font-bold leading-relaxed">{t('offerDesc', { name: players[Array.from(currentPlayer.truceProposals)[0] as number]?.name })}</p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                    <button onClick={() => respondToTruce(Array.from(currentPlayer.truceProposals)[0] as number, true)} className="flex-1 py-4 bg-emerald-600 text-white font-black rounded-2xl hover:bg-emerald-500 transition-all active:scale-95">{t('accept')}</button>
+                    <button onClick={() => respondToTruce(Array.from(currentPlayer.truceProposals)[0] as number, false)} className="flex-1 py-4 bg-red-900/50 text-red-400 font-black rounded-2xl hover:bg-red-900/80 transition-all active:scale-95">{t('decline')}</button>
+                  </div>
+                </>
+              )}
            </div>
         </div>
       )}
 
-      {isMyTurn && !pendingTruceTarget && currentPlayer?.truceProposals?.size > 0 && (
-        <div className="absolute inset-0 z-[150] bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-8">
-           <div className="max-w-md w-full bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 space-y-8 animate-in zoom-in-95 duration-300 shadow-2xl">
-              <div className="text-center space-y-4">
-                 <Bird className="w-16 h-16 mx-auto text-cyan-400" />
-                 <h2 className="text-3xl font-black">{t('offerReceived')}</h2>
-                 <p className="text-slate-400 font-bold">{t('offerDesc', { name: players[Array.from(currentPlayer.truceProposals)[0] as number]?.name })}</p>
-              </div>
-              <div className="flex gap-4">
-                 <button onClick={() => respondToTruce(Array.from(currentPlayer.truceProposals)[0] as number, true)} className="flex-1 py-4 bg-emerald-600 text-white font-black rounded-2xl hover:bg-emerald-500 transition-all">{t('accept')}</button>
-                 <button onClick={() => respondToTruce(Array.from(currentPlayer.truceProposals)[0] as number, false)} className="flex-1 py-4 bg-red-900/50 text-red-400 font-black rounded-2xl hover:bg-red-900/80 transition-all">{t('decline')}</button>
-              </div>
-           </div>
-        </div>
-      )}
-
+      {/* Sidebar for Desktop */}
       <aside className="hidden lg:flex w-72 bg-slate-900/40 backdrop-blur-3xl border-r border-white/5 flex-col z-20 shrink-0">
         <div className="p-8 border-b border-white/5 flex items-center gap-3"><Landmark className="w-6 h-6 text-yellow-500" /><h1 className="font-black tracking-tighter uppercase text-2xl">{t('title')}</h1></div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -1224,36 +1217,95 @@ const App: React.FC = () => {
         <div className="p-4 bg-slate-950/50 border-t border-white/5 flex justify-between items-center text-[10px] font-black uppercase text-slate-500 tracking-widest"><span>Year {gameTurn}</span><button onClick={resetToLanding} className="hover:text-white transition-all"><RotateCcw className="w-4 h-4"/></button></div>
       </aside>
 
-      <section className="flex-1 flex flex-col relative overflow-hidden">
-        <div className="lg:hidden flex bg-slate-900/80 backdrop-blur-xl border-b border-white/5 px-6 py-4 justify-between items-center z-50">
-           <div className="flex items-center gap-2 font-black tracking-tighter uppercase text-sm"><Landmark className="w-5 h-5 text-yellow-500" /> {t('title')}</div>
-           <div className="flex gap-2"><NavBtn active={mobileView === 'map'} icon={<LayoutGrid />} onClick={() => setMobileView('map')} /><NavBtn active={mobileView === 'status'} icon={<Users />} onClick={() => setMobileView('status')} /><NavBtn active={mobileView === 'logs'} icon={<List />} onClick={() => setMobileView('logs')} /></div>
+      <section className="flex-1 flex flex-col relative overflow-hidden h-full">
+        {/* Mobile Header Nav */}
+        <div className="lg:hidden flex bg-slate-950/90 backdrop-blur-xl border-b border-white/5 px-4 py-3 justify-between items-center z-50">
+           <div className="flex items-center gap-2 font-black tracking-tighter uppercase text-xs sm:text-sm"><Landmark className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" /> {t('title')}</div>
+           <div className="flex gap-2">
+              <NavBtn active={mobileView === 'map'} icon={<LayoutGrid />} onClick={() => setMobileView('map')} />
+              <NavBtn active={mobileView === 'status'} icon={<Users />} onClick={() => setMobileView('status')} />
+              <NavBtn active={mobileView === 'logs'} icon={<List />} onClick={() => setMobileView('logs')} />
+              <NavBtn active={false} icon={<RotateCcw />} onClick={resetToLanding} />
+           </div>
         </div>
+
         <div className="flex-1 relative overflow-hidden flex flex-col">
-          <div className={`flex-1 overflow-auto touch-pan-x touch-pan-y z-10 scrollbar-hide ${mobileView === 'map' ? 'block' : 'hidden lg:block'}`}><div className="min-h-full min-w-full flex items-center justify-center p-8 sm:p-12"><div className="min-w-max bg-slate-900/50 p-6 rounded-[2rem] border border-white/5 shadow-2xl backdrop-blur-md">{renderGrid}</div></div></div>
-          {mobileView === 'status' && <div className="lg:hidden flex-1 bg-slate-950 overflow-y-auto p-6"><CivilizationIntel players={players} currentIdx={currentIdx} gameTurn={gameTurn} grid={grid} t={t} getPlayerScore={getPlayerScore} myPlayerId={myPlayerId} mode={mode} /></div>}
-          {mobileView === 'logs' && <div className="lg:hidden flex-1 bg-slate-950 overflow-y-auto p-6"><LogChronicle logs={logs} players={players} t={t} /></div>}
+          {/* Main Map View */}
+          <div className={`flex-1 overflow-auto touch-pan-x touch-pan-y z-10 scrollbar-hide ${mobileView === 'map' ? 'block' : 'hidden lg:block'}`}>
+            <div className="min-h-full min-w-full flex items-center justify-center p-6 sm:p-12">
+              <div className="min-w-max bg-slate-900/40 p-3 sm:p-6 rounded-[2rem] border border-white/5 shadow-2xl backdrop-blur-md">
+                 {renderGrid}
+              </div>
+            </div>
+          </div>
+
+          {/* Intel View for Mobile */}
+          {mobileView === 'status' && (
+            <div className="lg:hidden flex-1 bg-slate-950 overflow-y-auto p-4 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="flex justify-between items-center mb-6"><h3 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">{t('civStatus')}</h3><div className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Year {gameTurn}</div></div>
+              <CivilizationIntel players={players} currentIdx={currentIdx} gameTurn={gameTurn} grid={grid} t={t} getPlayerScore={getPlayerScore} myPlayerId={myPlayerId} mode={mode} />
+            </div>
+          )}
+
+          {/* Logs View for Mobile */}
+          {mobileView === 'logs' && (
+            <div className="lg:hidden flex-1 bg-slate-950 overflow-y-auto p-4 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="flex justify-between items-center mb-6"><h3 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">{t('logs')}</h3></div>
+              <LogChronicle logs={logs} players={players} t={t} />
+            </div>
+          )}
         </div>
+
+        {/* Action Bar / HUD optimized for Mobile */}
         {phase === 'play' && mobileView === 'map' && (
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[60] flex flex-col items-center gap-4 w-full max-w-4xl px-4 animate-in slide-in-from-bottom-12 duration-500">
-             {currentPlayer && <div className="flex items-center gap-3 px-6 py-2 bg-slate-950/80 border border-white/5 rounded-full shadow-2xl backdrop-blur-xl"><div className="w-3 h-3 rounded-full animate-pulse" style={{ backgroundColor: currentPlayer.color }} /><span className="text-xs font-black uppercase tracking-widest" style={{ color: currentPlayer.color }}>{t('activePlayer', { name: currentPlayer.name })}</span></div>}
-             <div className="flex flex-col sm:flex-row gap-4 w-full items-center justify-center">
-                <div className="bg-slate-900/80 backdrop-blur-2xl border border-white/5 p-2 rounded-[2.5rem] flex flex-nowrap gap-2 shadow-2xl overflow-x-auto max-w-full scrollbar-hide snap-x touch-pan-x px-6 sm:px-2">
+          <div className="absolute bottom-4 sm:bottom-8 left-0 right-0 z-[60] flex flex-col items-center gap-3 sm:gap-4 w-full px-3 sm:px-4 animate-in slide-in-from-bottom-8 duration-500">
+             {currentPlayer && (
+               <div className="flex items-center gap-2 px-4 py-1.5 bg-slate-950/90 border border-white/10 rounded-full shadow-xl backdrop-blur-xl">
+                 <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: currentPlayer.color }} />
+                 <span className="text-[8px] sm:text-xs font-black uppercase tracking-widest" style={{ color: currentPlayer.color }}>{t('activePlayer', { name: currentPlayer.name })}</span>
+               </div>
+             )}
+             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full items-stretch sm:items-center justify-center max-w-5xl">
+                <div className="bg-slate-900/90 backdrop-blur-3xl border border-white/10 p-2 sm:p-2.5 rounded-[1.8rem] sm:rounded-[2.5rem] flex flex-nowrap gap-2 sm:gap-3 shadow-2xl overflow-x-auto scrollbar-hide snap-x touch-pan-x items-center justify-start sm:justify-center">
                   <HUDButton icon={<SquareArrowUp />} label={t('growCap')} color="yellow" onClick={() => { if (!currentPlayer.capitalUpgrade) { const next = currentPlayer.capitalLevel + 1; const nextPlayers = [...players]; const p = {...nextPlayers[currentIdx]}; p.capitalUpgrade = { targetLevel: next, remaining: getUpgradeCooldown(next) }; nextPlayers[currentIdx] = p; const newLogs = addLog(currentIdx, t('capUpStart', { lv: next }), 'growth'); nextTurn(grid, nextPlayers, newLogs); } }} active={!!currentPlayer.capitalUpgrade} disabled={!isMyTurn || !!pendingTruceTarget} badge={currentPlayer.capitalUpgrade ? `${currentPlayer.capitalUpgrade.remaining}T` : null}/>
                   <HUDButton icon={<Building2 />} label={t('cityBuild')} color="emerald" onClick={handleCityGrow} disabled={!isMyTurn || !!pendingTruceTarget}/>
                   <HUDButton icon={<MapIcon />} label={t('expand')} color="blue" onClick={handleExpand} disabled={!isMyTurn || !!pendingTruceTarget} badge={expansionRemaining > 0 ? `+${expansionRemaining}` : null}/>
-                  <div className="w-px bg-white/5 my-4 mx-2 shrink-0 self-stretch" />
+                  <div className="w-px h-8 bg-white/10 mx-1 shrink-0" />
                   <HUDButton icon={<Sword />} label={t('decWar')} color="red" onClick={handleWar} disabled={!isMyTurn || !!pendingTruceTarget}/>
                   <HUDButton icon={<Swords />} label={t('invade')} color="orange" onClick={handleInvasion} disabled={!isMyTurn || !!pendingTruceTarget || (currentPlayer.warWith?.size || 0) === 0}/>
-                  <HUDButton icon={<Bird className="w-5 h-5" />} label={t('truce')} color="cyan" onClick={handleTruce} disabled={!isMyTurn || !!pendingTruceTarget || (currentPlayer.warWith?.size || 0) === 0}/>
+                  <HUDButton icon={<Bird />} label={t('truce')} color="cyan" onClick={handleTruce} disabled={!isMyTurn || !!pendingTruceTarget || (currentPlayer.warWith?.size || 0) === 0}/>
                 </div>
-                <button onClick={() => nextTurn()} disabled={!isMyTurn} className="w-full sm:w-auto px-10 py-5 bg-white text-slate-950 rounded-[2rem] font-black text-lg hover:scale-105 transition-all shadow-2xl active:scale-95 flex items-center justify-center gap-3 shrink-0 whitespace-nowrap disabled:opacity-20">{t('endTurn')} <ChevronRight className="w-6 h-6"/></button>
+                <button 
+                  onClick={() => nextTurn()} 
+                  disabled={!isMyTurn} 
+                  className="px-6 sm:px-10 py-4 sm:py-5 bg-white text-slate-950 rounded-2xl sm:rounded-[2rem] font-black text-sm sm:text-lg hover:bg-slate-100 transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2 shrink-0 disabled:opacity-20 uppercase tracking-tighter"
+                >
+                  {t('endTurn')} <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6"/>
+                </button>
              </div>
           </div>
         )}
-        {phase === 'end' && <div className="absolute inset-0 z-[200] bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center p-8"><div className="max-w-xl w-full bg-slate-900 border border-white/5 rounded-[3rem] p-12 text-center space-y-8 animate-in zoom-in-95 duration-500 shadow-2xl"><Trophy className="w-24 h-24 mx-auto text-yellow-500 drop-shadow-[0_0_30px_rgba(234,179,8,0.5)]" /><div className="space-y-4"><h2 className="text-6xl font-black">{t('victory')}</h2><p className="text-xl text-slate-400 font-bold uppercase tracking-widest">{players.find(p => !p.eliminated && p.name)?.name} {t('winner')}</p></div><button onClick={resetToLanding} className="w-full py-6 bg-yellow-500 text-slate-950 font-black text-2xl rounded-3xl hover:bg-yellow-400 active:scale-95 transition-all">{t('restart')}</button></div></div>}
+
+        {/* End Game Modal */}
+        {phase === 'end' && (
+          <div className="fixed inset-0 z-[300] bg-slate-950/95 backdrop-blur-3xl flex items-center justify-center p-6">
+            <div className="max-w-md w-full bg-slate-900 border border-white/10 rounded-[2.5rem] sm:rounded-[3rem] p-10 sm:p-12 text-center space-y-6 sm:space-y-8 animate-in zoom-in-95 duration-500 shadow-2xl">
+               <div className="w-24 h-24 sm:w-32 sm:h-32 bg-yellow-500/10 rounded-full flex items-center justify-center mx-auto ring-4 ring-yellow-500/20"><Trophy className="w-12 h-12 sm:w-16 sm:h-16 text-yellow-500 drop-shadow-glow" /></div>
+               <div className="space-y-2">
+                 <h2 className="text-4xl sm:text-6xl font-black tracking-tighter">{t('victory')}</h2>
+                 <p className="text-xs sm:text-sm text-slate-400 font-black uppercase tracking-[0.2em] leading-relaxed px-4">{players.find(p => !p.eliminated && p.name)?.name} {t('winner')}</p>
+               </div>
+               <button onClick={resetToLanding} className="w-full py-5 bg-white text-slate-950 font-black text-xl rounded-2xl hover:bg-slate-100 active:scale-95 transition-all shadow-xl">{t('restart')}</button>
+            </div>
+          </div>
+        )}
       </section>
-      <aside className="hidden lg:flex w-80 bg-slate-900/40 backdrop-blur-3xl border-l border-white/5 flex-col z-20 shrink-0"><div className="p-8 border-b border-white/5"><h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">{t('logs')}</h3></div><div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin"><LogChronicle logs={logs} players={players} t={t} /></div></aside>
+
+      {/* Logs Sidebar for Desktop */}
+      <aside className="hidden lg:flex w-80 bg-slate-900/40 backdrop-blur-3xl border-l border-white/5 flex-col z-20 shrink-0">
+        <div className="p-8 border-b border-white/5"><h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">{t('logs')}</h3></div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin"><LogChronicle logs={logs} players={players} t={t} /></div>
+      </aside>
     </div>
   );
 };
