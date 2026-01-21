@@ -411,7 +411,7 @@ const App: React.FC = () => {
 
   const connectionsRef = useRef<any[]>([]);
   const isHostRef = useRef<boolean>(false);
-  const playersRef = useRef<Player[]>([]);
+  const playersRef = useRef<Player[]>([]); // Using ref to avoid stale closures in some callbacks
   const gridRef = useRef<Cell[][]>([]);
   const currentIdxRef = useRef<number>(0);
   const turnRef = useRef<number>(1);
@@ -871,9 +871,17 @@ const App: React.FC = () => {
       next[myPlayerId] = { ...next[myPlayerId], name, color };
       if (mode === 'online') {
         const msg = { type: 'LOBBY_UPDATE', payload: { players: next.map(serializePlayer) } };
-        // If host, broadcast to all clients. If client, send to host.
-        if (isHost) connections.forEach(c => c.send(msg));
-        else if (connections.length > 0) connections[0].send(msg);
+        if (isHost) {
+          connections.forEach(c => c.send(msg));
+          // If the host changes their profile and their room is public, update the public room listing
+          if (isPublic && roomId) {
+            setPublicRooms(currentPublicRooms => currentPublicRooms.map(room =>
+              room.id === roomId ? { ...room, hostName: name } : room
+            ));
+          }
+        } else if (connections.length > 0) {
+          connections[0].send(msg);
+        }
       }
       return next;
     });
@@ -919,22 +927,23 @@ const App: React.FC = () => {
   }, []);
 
   const handleRefreshPublicRooms = useCallback(() => {
-    // Ensure playersRef.current is up-to-date for hostName
-    const currentHostName = playersRef.current[0]?.name || (lang === 'ko' ? '방장' : 'Host');
+    // Get host player from the `players` state if available and current user is host
+    // `players` is in this useCallback's dependency array, so it will be the latest state.
+    const hostPlayer = (isHost && myPlayerId === 0) ? players[0] : null;
+    const currentHostName = hostPlayer?.name || (lang === 'ko' ? '방장' : 'Host');
 
-    if (isHost && roomId && isPublic) { // Also check isPublic
+    if (isHost && roomId && isPublic && hostPlayer) { // Added hostPlayer check for safety
         setPublicRooms([{
             id: roomId,
             name: roomName,
-            currentPlayers: connections.length + 1, // Host + all connected clients
+            currentPlayers: connections.length + 1,
             maxPlayers: playerCount,
             hostName: currentHostName
         }]);
     } else {
-        // For clients or if no public room is actively hosted by this user (or it's private), clear the list.
-        setPublicRooms(clearPublicRooms());
+        setPublicRooms([]); // Directly clear, equivalent to clearPublicRooms()
     }
-  }, [isHost, roomId, roomName, isPublic, connections.length, playerCount, playersRef, lang, clearPublicRooms]);
+  }, [isHost, roomId, roomName, isPublic, connections.length, playerCount, players, myPlayerId, lang]);
 
   useEffect(() => {
     // When entering discovery mode, trigger a refresh to show any relevant rooms (currently only self-hosted public ones).
@@ -947,16 +956,34 @@ const App: React.FC = () => {
     setOnlineStatus('connecting');
     const p = new Peer();
     p.on('open', (id: string) => {
-      setRoomId(id); setIsHost(true); setMyPlayerId(0); setOnlineStatus('lobby'); setPeer(p);
-      setPlayers([{
-        id: 0, name: playersRef.current[0]?.name || (lang === 'ko' ? '방장' : 'Host'), color: playersRef.current[0]?.color || DEFAULT_COLORS[0],
+      setRoomId(id);
+      setIsHost(true);
+      setMyPlayerId(0);
+      setOnlineStatus('lobby');
+      setPeer(p);
+
+      // Determine the initial host player name and color.
+      // Use the name from the `players` state (which reflects previous config or default)
+      // or a fallback default if `players[0]` is not yet meaningful.
+      const initialHostName = players[0]?.name || (lang === 'ko' ? '방장' : 'Host');
+      const initialHostColor = players[0]?.color || DEFAULT_COLORS[0];
+
+      const hostInitialPlayer: Player = {
+        id: 0,
+        name: initialHostName, // Use this consistent initial name
+        color: initialHostColor,
         capital: null, capitalLevel: 1, capitalUpgrade: null, cities: [], territory: new Set<string>(), originalTerritories: new Set<string>(), warWith: new Set<PlayerID>(), truceWith: new Set<PlayerID>(), truceTurns: {}, truceProposals: new Set<PlayerID>(), eliminated: false,
-      }]);
+      };
+      setPlayers([hostInitialPlayer]);
 
       if (isPublic) {
-          // Add the newly created public room to the list so the host can see it.
-          // This happens locally; true discovery for others needs a backend.
-          setPublicRooms(prev => [...prev, { id: id, name: roomName, currentPlayers: 1, maxPlayers: playerCount, hostName: playersRef.current[0]?.name || (lang === 'ko' ? '방장' : 'Host') }]);
+          setPublicRooms(prev => [...prev, {
+              id: id,
+              name: roomName, // Room name from input field
+              currentPlayers: 1,
+              maxPlayers: playerCount,
+              hostName: hostInitialPlayer.name // Use the determined host's name
+          }]);
       }
     });
     p.on('connection', (conn: any) => {
@@ -969,12 +996,19 @@ const App: React.FC = () => {
           }];
           conn.send({ type: 'LOBBY_UPDATE', payload: { players: nextPlayers.map(serializePlayer), myId: newId } });
           connectionsRef.current.forEach(c => c.send({ type: 'LOBBY_UPDATE', payload: { players: nextPlayers.map(serializePlayer) } }));
+
+          // If the room is public and current user is host, update publicRooms to reflect new player count.
+          if (isHostRef.current && isPublic) { 
+            setPublicRooms(currentPublicRooms => currentPublicRooms.map(room =>
+              room.id === roomId ? { ...room, currentPlayers: nextPlayers.length } : room
+            ));
+          }
           return nextPlayers;
         });
       });
       conn.on('data', handlePeerData);
     });
-  }, [lang, isPublic, roomName, playerCount, players, handlePeerData]);
+  }, [lang, isPublic, roomName, playerCount, players, handlePeerData, roomId]);
 
   const handleJoin = useCallback((targetId?: string) => {
     const id = targetId || joinId;
