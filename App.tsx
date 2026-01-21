@@ -1230,9 +1230,9 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex-1 relative overflow-hidden flex flex-col">
-          {/* Main Map View */}
+          {/* Main Map View - Optimized with loose scrolling */}
           <div className={`flex-1 overflow-auto touch-pan-x touch-pan-y z-10 scrollbar-hide ${mobileView === 'map' ? 'block' : 'hidden lg:block'}`}>
-            <div className="min-h-full min-w-full flex items-center justify-center p-6 sm:p-12">
+            <div className="min-h-full min-w-full flex items-start sm:items-center justify-center p-6 sm:p-12 pb-[50vh] sm:pb-12 pt-20 sm:pt-12 px-20 sm:px-12">
               <div className="min-w-max bg-slate-900/40 p-3 sm:p-6 rounded-[2rem] border border-white/5 shadow-2xl backdrop-blur-md">
                  {renderGrid}
               </div>
