@@ -491,13 +491,11 @@ const App: React.FC = () => {
   }, []);
 
   /**
-   * Synchronizes the game state across connected peers.
-   * This function is called by the host to broadcast state to clients,
-   * or by clients (e.g., for lobby updates or tool responses) to send state to the host.
-   * A full state synchronization approach is used to ensure consistency.
+   * Broadcasts the current game state to all connected clients.
+   * This function is exclusively called by the host to ensure authoritative state synchronization.
    */
-  const syncGameState = (updatedPlayers: Player[], updatedGrid: Cell[][], updatedCurrentIdx: number, updatedTurn: number, updatedPhase: GamePhase, updatedLogs: GameLogEntry[]) => {
-    if (mode === 'online') {
+  const broadcastGameState = useCallback((updatedPlayers: Player[], updatedGrid: Cell[][], updatedCurrentIdx: number, updatedTurn: number, updatedPhase: GamePhase, updatedLogs: GameLogEntry[]) => {
+    if (mode === 'online' && isHostRef.current) {
       const payload = {
         players: updatedPlayers.map(serializePlayer),
         grid: updatedGrid,
@@ -507,14 +505,10 @@ const App: React.FC = () => {
         logs: updatedLogs,
       };
       const msg = { type: 'SYNC_STATE', payload };
-      if (isHostRef.current) {
-        connectionsRef.current.forEach(conn => conn.send(msg));
-      } else if (connectionsRef.current.length > 0) {
-        // In client role, send to the host (first connection)
-        connectionsRef.current[0].send(msg);
-      }
+      connectionsRef.current.forEach(conn => conn.send(msg));
     }
-  };
+  }, [mode]); // Dependencies: mode, isHostRef.current, connectionsRef.current (implicitly via connectionsRef.current)
+
 
   const checkWinCondition = (updatedPlayers: Player[], currentLogs: GameLogEntry[]) => {
     const techWinner = updatedPlayers.find(p => p.capitalLevel >= 10);
@@ -586,7 +580,7 @@ const App: React.FC = () => {
     if (isTutorial) setTutStep(1);
     if (mode === 'online' && isHost) {
         connections.forEach((conn, i) => conn.send({ type: 'START_GAME', myId: i + 1 }));
-        syncGameState(finalPlayers, initialGrid, 0, 1, 'setup', initLogs);
+        broadcastGameState(finalPlayers, initialGrid, 0, 1, 'setup', initLogs);
     }
   };
 
@@ -623,13 +617,46 @@ const App: React.FC = () => {
     return { players: nextP, grid: nextGrid };
   };
 
-  const nextTurn = (updatedGrid?: Cell[][], updatedPlayers?: Player[], updatedLogs?: GameLogEntry[]) => {
+  const nextTurn = useCallback((updatedGrid?: Cell[][], updatedPlayers?: Player[], updatedLogs?: GameLogEntry[], playerRequestingTurnEndId: number | null = null) => {
+    // If online mode and this is a client, send a request to the host.
+    if (mode === 'online' && !isHostRef.current) {
+        if (currentIdxRef.current !== myPlayerIdRef.current) {
+            showMessage(t('notYourTurn')); // Prevent current client from acting if it's not their turn
+            return;
+        }
+        if (connectionsRef.current.length > 0) {
+            // Client is requesting to end their turn.
+            connectionsRef.current[0].send({ type: 'END_TURN_REQUEST', payload: { playerId: myPlayerIdRef.current } });
+            // Clear client's local pending states and show waiting message
+            setPendingAction(null);
+            setSelectableCells(new Set());
+            setExpansionRemaining(0);
+            setPendingTruceTarget(null);
+            showMessage(t('notYourTurn')); 
+        } else {
+            console.warn('Client tried to end turn but no host connection found.');
+        }
+        return; // Client does not execute local game logic
+    }
+
+    // If we are here, it's either local mode, or we are the host in online mode.
+    // Proceed with game logic.
     if (phaseRef.current === 'end') return;
-    if (!isMyTurn) return; // Use isMyTurn for player actions
+    
+    // If it's a host processing a client's request, ensure it's that player's turn.
+    if (mode === 'online' && isHostRef.current && playerRequestingTurnEndId !== null && currentIdxRef.current !== playerRequestingTurnEndId) {
+        console.warn(`Host: Received END_TURN_REQUEST from player ${playerRequestingTurnEndId} but it's not their turn.`);
+        return;
+    }
+
+    setPendingAction(null); setSelectableCells(new Set()); setExpansionRemaining(0); setPendingTruceTarget(null);
+
     const finalGrid = updatedGrid || gridRef.current;
     let finalLogs = updatedLogs || logsRef.current;
     const workingPlayers = [...(updatedPlayers || playersRef.current)];
     const p = { ...workingPlayers[currentIdxRef.current] };
+
+    // --- Core game logic for turn advancement ---
     if (p.capitalUpgrade) {
       const up = { ...p.capitalUpgrade, remaining: p.capitalUpgrade.remaining - 1 };
       if (up.remaining <= 0) {
@@ -656,44 +683,82 @@ const App: React.FC = () => {
     });
     p.truceTurns = newTruceTurns; p.truceWith = newTruceWith;
     workingPlayers[currentIdxRef.current] = p;
+
     const winResult = checkWinCondition(workingPlayers, finalLogs);
     const finalPhase = winResult.phase;
     finalLogs = winResult.logs;
-    setPendingAction(null); setSelectableCells(new Set()); setExpansionRemaining(0); setPendingTruceTarget(null);
-    let nextIdx = (currentIdxRef.current + 1) % playerCount;
+
+    let nextIdx = (currentIdxRef.current + 1) % playerCountRef.current;
     const areThereSurvivors = workingPlayers.some((pl, idx) => !pl.eliminated && pl.name && idx !== currentIdxRef.current);
-    if (areThereSurvivors) { while (workingPlayers[nextIdx] && (workingPlayers[nextIdx].eliminated || !workingPlayers[nextIdx].name)) { nextIdx = (nextIdx + 1) % playerCount; } }
+    if (areThereSurvivors) { while (workingPlayers[nextIdx] && (workingPlayers[nextIdx].eliminated || !workingPlayers[nextIdx].name)) { nextIdx = (nextIdx + 1) % playerCountRef.current; } }
     let nextTurnNum = turnRef.current;
     if (nextIdx === 0) { nextTurnNum = turnRef.current + 1; setGameTurn(nextTurnNum); }
+    // --- End core game logic ---
+
     setPlayers(workingPlayers); setGrid(finalGrid); setLogs(finalLogs); setCurrentIdx(nextIdx); setPhase(finalPhase);
     if (isTutorial && nextTurnNum === 2 && tutStep === 1) setTutStep(2);
     if (isTutorial && nextTurnNum === 4 && tutStep === 2) setTutStep(3);
-    if (mode === 'online') { syncGameState(workingPlayers, finalGrid, nextIdx, nextTurnNum, finalPhase, finalLogs); }
-  };
+
+    // Only host broadcasts the new authoritative state
+    if (mode === 'online' && isHostRef.current) { 
+      broadcastGameState(workingPlayers, finalGrid, nextIdx, nextTurnNum, finalPhase, finalLogs);
+    }
+  }, [mode, playerCountRef, isTutorial, tutStep, t, addLog, checkWinCondition, showMessage]); // Dependencies updated
 
   const cellClick = (x: number, y: number) => {
-    if (!isMyTurn) return;
-    if (phaseRef.current === 'setup') {
-      if (gridRef.current[y][x].owner !== null) return;
-      let tooClose = false;
-      playersRef.current.forEach(p => { if (p.capital) { const dist = Math.max(Math.abs(p.capital.x - x), Math.abs(p.capital.y - y)); if (dist < 5) tooClose = true; } });
-      if (tooClose) { showMessage(t('tooCloseCap')); return; }
-      const newGrid = [...gridRef.current.map(row => [...row])];
-      const newPlayers = [...playersRef.current.map(p => ({ ...p, territory: new Set(p.territory), originalTerritories: new Set(p.originalTerritories) }))];
-      const p = { ...newPlayers[currentIdxRef.current] };
-      p.capital = { x, y }; p.territory.add(`${y},${x}`); p.originalTerritories.add(`${y},${x}`);
-      newGrid[y][x] = { owner: currentIdxRef.current, type: 'capital', control: 'capital', level: 1 };
-      claimAround(currentIdxRef.current, x, y, 1, newPlayers, newGrid);
-      newPlayers[currentIdxRef.current] = p;
-      const survivorsCount = newPlayers.filter(pl => pl.name).length;
-      const isLastPlayer = currentIdxRef.current === survivorsCount - 1;
-      const nextPhase = isLastPlayer ? 'play' : 'setup';
-      const nextIdx = isLastPlayer ? 0 : currentIdxRef.current + 1;
-      let finalLogs = logsRef.current;
-      if (isLastPlayer) { finalLogs = addLog(-1, t('struggleStart'), 'info'); setPhase('play'); }
-      setGrid(newGrid); setPlayers(newPlayers); setCurrentIdx(nextIdx);
-      syncGameState(newPlayers, newGrid, nextIdx, turnRef.current, nextPhase, finalLogs);
-    } else if (phaseRef.current === 'play' && pendingAction) { pendingAction(x, y); }
+    if (!isMyTurn) return; // Prevent client interaction if not their turn in online mode
+
+    // Host or local mode: direct execution
+    if (mode === 'local' || isHostRef.current) {
+      if (phaseRef.current === 'setup') {
+        if (gridRef.current[y][x].owner !== null) return;
+        let tooClose = false;
+        playersRef.current.forEach(p => { if (p.capital) { const dist = Math.max(Math.abs(p.capital.x - x), Math.abs(p.capital.y - y)); if (dist < 5) tooClose = true; } });
+        if (tooClose) { showMessage(t('tooCloseCap')); return; }
+        const newGrid = [...gridRef.current.map(row => [...row])];
+        const newPlayers = [...playersRef.current.map(p => ({ ...p, territory: new Set(p.territory), originalTerritories: new Set(p.territory) }))];
+        const p = { ...newPlayers[currentIdxRef.current] };
+        p.capital = { x, y }; p.territory.add(`${y},${x}`); p.originalTerritories.add(`${y},${x}`);
+        newGrid[y][x] = { owner: currentIdxRef.current, type: 'capital', control: 'capital', level: 1 };
+        claimAround(currentIdxRef.current, x, y, 1, newPlayers, newGrid);
+        newPlayers[currentIdxRef.current] = p;
+        const survivorsCount = newPlayers.filter(pl => pl.name).length;
+        const isLastPlayer = currentIdxRef.current === survivorsCount - 1;
+        const nextPhase = isLastPlayer ? 'play' : 'setup';
+        const nextIdx = isLastPlayer ? 0 : currentIdxRef.current + 1;
+        let finalLogs = logsRef.current;
+        if (isLastPlayer) { finalLogs = addLog(-1, t('struggleStart'), 'info'); setPhase('play'); }
+        setGrid(newGrid); setPlayers(newPlayers); setCurrentIdx(nextIdx);
+        // Only host broadcasts setup changes
+        if (mode === 'online' && isHostRef.current) {
+          broadcastGameState(newPlayers, newGrid, nextIdx, turnRef.current, nextPhase, finalLogs);
+        }
+      } else if (phaseRef.current === 'play' && pendingAction) { 
+        pendingAction(x, y); 
+      }
+    } else { // Online mode and not host (client)
+      if (phaseRef.current === 'setup') {
+        // Client sends a request to the host to place capital
+        if (gridRef.current[y][x].owner !== null) return;
+        let tooClose = false;
+        playersRef.current.forEach(p => { if (p.capital) { const dist = Math.max(Math.abs(p.capital.x - x), Math.abs(p.capital.y - y)); if (dist < 5) tooClose = true; } });
+        if (tooClose) { showMessage(t('tooCloseCap')); return; }
+
+        if (connectionsRef.current.length > 0) {
+          connectionsRef.current[0].send({ 
+            type: 'SETUP_CAPITAL_REQUEST', 
+            payload: { playerId: myPlayerIdRef.current, x, y } 
+          });
+          showMessage(t('notYourTurn')); // Show waiting message
+        }
+        return;
+      } else if (phaseRef.current === 'play' && pendingAction) {
+        // For clients, pendingAction will directly or indirectly trigger nextTurn,
+        // which will then send END_TURN_REQUEST to the host.
+        // Local visual feedback might happen before official state update.
+        pendingAction(x, y);
+      }
+    }
   };
 
   const handleCityGrow = () => {
@@ -861,7 +926,7 @@ const App: React.FC = () => {
     gridRef.current.forEach((row, y) => row.forEach((cell, x) => { if (cell.owner !== null && cell.owner !== currentIdxRef.current && !currentPlayer.warWith.has(cell.owner) && !currentPlayer.truceWith.has(cell.owner)) enemyTerritories.add(`${y},${x}`); }));
     if (enemyTerritories.size === 0) return;
     setSelectableCells(enemyTerritories); showMessage(t('pickEnemy'));
-    setPendingAction(() => (x: number, y: number) => { // Corrected: removed extra ()
+    setPendingAction(() => (x: number, y: number) => { 
       const targetCell = gridRef.current[y][x]; if (!enemyTerritories.has(`${y},${x}`)) return;
       const targetId = targetCell.owner!;
       const nextP = [...playersRef.current.map(pl => ({ ...pl, warWith: new Set(pl.warWith) }))];
@@ -878,7 +943,7 @@ const App: React.FC = () => {
     const enemyTerritories: Set<string> = new Set();
     gridRef.current.forEach((row, y) => row.forEach((cell, x) => { if (cell.owner !== null && cell.owner !== currentIdxRef.current && currentPlayer.warWith.has(cell.owner)) { enemyTerritories.add(`${y},${x}`); } }));
     setSelectableCells(enemyTerritories); showMessage(t('pickTruceEnemy'));
-    setPendingAction(() => (x: number, y: number) => { // Corrected: removed extra ()
+    setPendingAction(() => (x: number, y: number) => { 
       const targetCell = gridRef.current[y][x]; if (!enemyTerritories.has(`${y},${x}`)) return;
       const targetId = targetCell.owner!;
       const nextP = [...playersRef.current.map(pl => ({ ...pl, truceProposals: new Set(pl.truceProposals) }))];
@@ -888,9 +953,37 @@ const App: React.FC = () => {
     });
   };
 
-  const respondToTruce = (proposingPlayerId: number, accept: boolean) => {
-    if (!isMyTurn) return;
-    let nextP = playersRef.current; let nextGrid = gridRef.current; let nextLogs = logsRef.current;
+  const respondToTruce = useCallback((proposingPlayerId: number, accept: boolean) => {
+    // If online mode and this is a client, send a request to the host.
+    if (mode === 'online' && !isHostRef.current) {
+      if (currentIdxRef.current !== myPlayerIdRef.current) {
+        showMessage(t('notYourTurn')); // Prevent current client from acting if it's not their turn
+        return;
+      }
+      if (connectionsRef.current.length > 0) {
+        connectionsRef.current[0].send({ 
+          type: 'TRUCE_RESPONSE_REQUEST', 
+          payload: { 
+            playerId: myPlayerIdRef.current, 
+            proposingPlayerId, 
+            accept 
+          } 
+        });
+        showMessage(t('notYourTurn')); // Show waiting message
+      } else {
+        console.warn('Client tried to respond to truce but no host connection found.');
+      }
+      return; // Client does not execute local game logic
+    }
+
+    // If we are here, it's either local mode or we are the host in online mode.
+    // Proceed with truce logic.
+    if (!isMyTurn) return; // Should always be my turn if I'm host and processing locally
+
+    let nextP = playersRef.current; 
+    let nextGrid = gridRef.current; 
+    let nextLogs = logsRef.current;
+
     if (accept) {
       const truceRes = establishTruce(currentIdx, proposingPlayerId, playersRef.current, gridRef.current);
       nextP = truceRes.players; nextGrid = truceRes.grid;
@@ -901,8 +994,12 @@ const App: React.FC = () => {
       nextLogs = addLog(currentIdxRef.current, t('truceDeclineLog', { name: currentPlayer.name }), 'info');
     }
     setPlayers(nextP); setGrid(nextGrid); setLogs(nextLogs);
-    syncGameState(nextP, nextGrid, currentIdxRef.current, turnRef.current, phaseRef.current, nextLogs);
-  };
+    // Only host broadcasts the new authoritative state
+    if (mode === 'online' && isHostRef.current) {
+      broadcastGameState(nextP, nextGrid, currentIdxRef.current, turnRef.current, phaseRef.current, nextLogs);
+    }
+  }, [mode, isHostRef, currentIdxRef, myPlayerIdRef, connectionsRef, showMessage, t, addLog, currentPlayer, players, grid, broadcastGameState, isMyTurn]); // Dependencies updated
+
 
   const updateProfile = (name: string, color: string) => {
     if (myPlayerId === null) return;
@@ -920,6 +1017,7 @@ const App: React.FC = () => {
             ));
           }
         } else if (connections.length > 0) {
+          // Client sends lobby update to host
           connections[0].send(msg);
         }
       }
@@ -943,6 +1041,7 @@ const App: React.FC = () => {
       case 'LOBBY_UPDATE':
         // Updates lobby specific information, like player list and their details.
         // If host, re-broadcasts the updated lobby state to all connected clients.
+        // If client, applies the host's lobby update.
         if (data.payload.myId !== undefined) setMyPlayerId(data.payload.myId);
         if (data.payload.players) {
           setPlayers(data.payload.players.map(deserializePlayer));
@@ -955,16 +1054,90 @@ const App: React.FC = () => {
         setUiState('game'); setPhase('setup');
         break;
       case 'SYNC_STATE':
-        // Receives a full snapshot of the game state and updates all relevant state variables.
-        // This is a robust way to ensure clients are always in sync with the host's game state.
+        // Receives a full snapshot of the game state from the host and updates all relevant state variables.
+        // This is the authoritative state for clients.
         const { players: p, grid: g, currentIdx: ci, turn: t, phase: ph, logs: l } = data.payload;
         setPlayers(p.map(deserializePlayer)); setGrid(g); setCurrentIdx(ci); setGameTurn(t); setPhase(ph); setLogs(l);
+        // Clear client's local pending states after receiving new state from host
+        setPendingAction(null);
+        setSelectableCells(new Set());
+        setExpansionRemaining(0);
+        setPendingTruceTarget(null);
+        setMessage(null); // Clear any 'waiting' messages
         break;
-      // Add more cases here for other network messages (e.g., chat, specific actions if not using full state sync)
+      case 'END_TURN_REQUEST':
+        if (isHostRef.current) {
+          // Host receives a request to end turn from a client.
+          const requestedPlayerId = data.payload.playerId;
+          if (currentIdxRef.current === requestedPlayerId) {
+            nextTurn(undefined, undefined, undefined, requestedPlayerId); // Host processes its next turn
+          } else {
+            console.warn(`Host received END_TURN_REQUEST from player ${requestedPlayerId} but it's not their turn.`);
+          }
+        }
+        break;
+      case 'TRUCE_RESPONSE_REQUEST':
+        if (isHostRef.current) {
+          // Host receives a truce response from a client.
+          const { playerId, proposingPlayerId, accept } = data.payload;
+          if (currentIdxRef.current === playerId) {
+            respondToTruce(proposingPlayerId, accept); // Host processes the truce response
+          } else {
+            console.warn(`Host received TRUCE_RESPONSE_REQUEST from player ${playerId} but it's not their turn.`);
+          }
+        }
+        break;
+      case 'SETUP_CAPITAL_REQUEST':
+        if (isHostRef.current) {
+          // Host receives a request to place capital during setup phase
+          const { playerId, x, y } = data.payload;
+          if (phaseRef.current === 'setup' && currentIdxRef.current === playerId) {
+            // Re-use existing cellClick logic for capital placement directly
+            // Need to ensure the logic in cellClick doesn't directly call syncGameState if it's not the host's action.
+            // For now, call the core logic directly (or modify cellClick to take an 'isHost' flag)
+            // Or simpler: have client-specific cellClick for setup send request.
+            
+            // Re-run the setup part of cellClick directly for the host.
+            // This re-evaluates the conditions (tooClose) before applying.
+            let tooClose = false;
+            playersRef.current.forEach(p => { if (p.capital) { const dist = Math.max(Math.abs(p.capital.x - x), Math.abs(p.capital.y - y)); if (dist < 5) tooClose = true; } });
+            if (gridRef.current[y][x].owner !== null || tooClose) {
+                console.warn(`Host: Client ${playerId} attempted invalid capital placement at (${x}, ${y}).`);
+                return;
+            }
+
+            const newGrid = [...gridRef.current.map(row => [...row])];
+            const newPlayers = [...playersRef.current.map(p_ => ({ ...p_, territory: new Set(p_.territory), originalTerritories: new Set(p_.originalTerritories) }))];
+            const p_ = { ...newPlayers[playerId] };
+            p_.capital = { x, y }; p_.territory.add(`${y},${x}`); p_.originalTerritories.add(`${y},${x}`);
+            newGrid[y][x] = { owner: playerId, type: 'capital', control: 'capital', level: 1 };
+            claimAround(playerId, x, y, 1, newPlayers, newGrid);
+            newPlayers[playerId] = p_;
+            
+            setGrid(newGrid); setPlayers(newPlayers);
+            // After placing, determine next turn, etc.
+            // This is effectively part of the turn transition in setup phase.
+            // Host then advances the turn (to next player's setup or to play phase)
+            // and broadcasts.
+            const survivorsCount = newPlayers.filter(pl => pl.name).length;
+            const isLastPlayer = playerId === survivorsCount - 1; // Assuming players are added sequentially by ID
+            const nextPhase = isLastPlayer ? 'play' : 'setup';
+            const nextIdx = isLastPlayer ? 0 : playerId + 1; // Advance to next player ID
+            let finalLogs = logsRef.current;
+            if (isLastPlayer) { finalLogs = addLog(-1, t('struggleStart'), 'info'); }
+
+            setLogs(finalLogs); setCurrentIdx(nextIdx); setPhase(nextPhase);
+            broadcastGameState(newPlayers, newGrid, nextIdx, turnRef.current, nextPhase, finalLogs);
+
+          } else {
+            console.warn(`Host received SETUP_CAPITAL_REQUEST from player ${playerId} during wrong phase or not their turn.`);
+          }
+        }
+        break;
       default:
         console.warn('Received unknown peer data type:', data.type, data);
     }
-  }, []);
+  }, [addLog, broadcastGameState, checkWinCondition, currentIdxRef, isHostRef, connectionsRef, nextTurn, respondToTruce, playersRef, phaseRef, t, turnRef, myPlayerIdRef]); // Dependencies updated
 
   const handleRefreshPublicRooms = useCallback(() => {
     // Access state via refs to ensure the most current values are read,
@@ -1064,7 +1237,7 @@ const App: React.FC = () => {
       });
       conn.on('data', handlePeerData);
     });
-  }, [lang, roomName, playerCount, isPublic, playersRef]); // Added isPublic to deps, removed roomId as it's set in this callback
+  }, [lang, roomName, playerCount, isPublic, playersRef, handlePeerData]); // Added handlePeerData to deps
 
   const handleJoin = useCallback((targetId?: string) => {
     const id = targetId || joinId;
