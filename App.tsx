@@ -554,7 +554,7 @@ const App: React.FC = () => {
     }
   };
 
-  const establishTruce = (p1Id: number, p2Id: number, currentPlayers: Player[]) => {
+  const establishTruce = (p1Id: number, p2Id: number, currentPlayers: Player[], currentGrid: Cell[][]) => {
     const nextP = [...currentPlayers.map(pl => ({ 
       ...pl, 
       warWith: new Set(pl.warWith), 
@@ -570,8 +570,28 @@ const App: React.FC = () => {
       nextP[id].truceTurns[other] = 4;
       nextP[id].truceProposals.delete(other);
     });
+
+    const nextGrid = [...currentGrid.map(row => [...row])];
+    [p1Id, p2Id].forEach(pid => {
+        const hubs = [
+            { id: 'capital', x: nextP[pid].capital!.x, y: nextP[pid].capital!.y },
+            ...nextP[pid].cities.map(c => ({ id: c.id, x: c.x, y: c.y }))
+        ];
+
+        nextGrid.forEach((row, gy) => row.forEach((cell, gx) => {
+            if (cell.owner === pid && cell.control?.includes('captured')) {
+                let nearestHub = hubs[0];
+                let minDist = Math.abs(gx - nearestHub.x) + Math.abs(gy - nearestHub.y);
+                hubs.forEach(hub => {
+                    const d = Math.abs(gx - hub.x) + Math.abs(gy - hub.y);
+                    if (d < minDist) { minDist = d; nearestHub = hub; }
+                });
+                nextGrid[gy][gx] = { ...cell, control: nearestHub.id };
+            }
+        }));
+    });
     
-    return nextP;
+    return { players: nextP, grid: nextGrid };
   };
 
   const nextTurn = (updatedGrid?: Cell[][], updatedPlayers?: Player[], updatedLogs?: GameLogEntry[]) => {
@@ -839,7 +859,12 @@ const App: React.FC = () => {
 
     targets.forEach(key => {
       const [ty, tx] = key.split(',').map(Number); const cell = nextGrid[ty][tx]; const oldOwnerId = cell.owner!;
-      const defenderScore = getPlayerScore(oldOwnerId, nextPlayers, nextGrid);
+      let defenderScore = getPlayerScore(oldOwnerId, nextPlayers, nextGrid);
+      
+      if (cell.control?.includes('captured')) {
+          defenderScore *= 0.5;
+      }
+
       const successChance = Math.max(0.05, attackerScore / (attackerScore + defenderScore));
       if (Math.random() < successChance) {
         totalCaptured++;
@@ -919,10 +944,13 @@ const App: React.FC = () => {
   const respondToTruce = (proposingPlayerId: number, accept: boolean) => {
     if (!isMyTurn) return;
     let nextP = playersRef.current;
+    let nextGrid = gridRef.current;
     let nextLogs = logsRef.current;
     
     if (accept) {
-      nextP = establishTruce(currentIdxRef.current, proposingPlayerId, playersRef.current);
+      const truceRes = establishTruce(currentIdxRef.current, proposingPlayerId, playersRef.current, gridRef.current);
+      nextP = truceRes.players;
+      nextGrid = truceRes.grid;
       nextLogs = addLog(currentIdxRef.current, t('truceAcceptLog', { p1: currentPlayer.name, p2: players[proposingPlayerId].name }), 'peace');
     } else {
       nextP = [...playersRef.current.map(pl => ({ ...pl, truceProposals: new Set(pl.truceProposals) }))];
@@ -931,8 +959,9 @@ const App: React.FC = () => {
     }
     
     setPlayers(nextP);
+    setGrid(nextGrid);
     setLogs(nextLogs);
-    syncGameState(nextP, gridRef.current, currentIdxRef.current, turnRef.current, phaseRef.current, nextLogs);
+    syncGameState(nextP, nextGrid, currentIdxRef.current, turnRef.current, phaseRef.current, nextLogs);
   };
 
   const updateProfile = (name: string, color: string) => {
@@ -1035,34 +1064,76 @@ const App: React.FC = () => {
       {row.map((cell, x) => {
         const isSelectable = selectableCells.has(`${y},${x}`);
         const ownerColor = cell.owner !== null && players[cell.owner] ? players[cell.owner].color : 'transparent';
-        const borders = {
-            top: y > 0 && grid[y-1][x].owner === cell.owner && grid[y-1][x].control !== cell.control,
-            right: x < gridSize - 1 && grid[y][x+1].owner === cell.owner && grid[y][x+1].control !== cell.control,
-            bottom: y < gridSize - 1 && grid[y+1][x].owner === cell.owner && grid[y+1][x].control !== cell.control,
-            left: x > 0 && grid[y][x-1].owner === cell.owner && grid[y][x-1].control !== cell.control,
+        
+        const checkNeighbor = (ny: number, nx: number) => {
+            if (ny < 0 || ny >= gridSize || nx < 0 || nx >= gridSize) return 'edge';
+            const neighbor = grid[ny][nx];
+            if (neighbor.owner !== cell.owner) return 'international';
+            if (neighbor.control !== cell.control) return 'jurisdiction';
+            return 'same';
         };
+
+        const checkOwnerNeighbor = (ny: number, nx: number) => {
+            if (ny < 0 || ny >= gridSize || nx < 0 || nx >= gridSize) return false;
+            return grid[ny][nx].owner === cell.owner;
+        };
+
+        const borders = {
+            top: checkNeighbor(y - 1, x),
+            right: checkNeighbor(y, x + 1),
+            bottom: checkNeighbor(y + 1, x),
+            left: checkNeighbor(y, x - 1),
+        };
+
+        const ownerBorders = {
+            top: !checkOwnerNeighbor(y - 1, x),
+            right: !checkOwnerNeighbor(y, x + 1),
+            bottom: !checkOwnerNeighbor(y + 1, x),
+            left: !checkOwnerNeighbor(y, x - 1),
+        };
+
+        const getBorderStyle = (type: string) => {
+            // Thinner border outlines as requested
+            if (type === 'international') return '1.5px solid rgba(0,0,0,0.75)';
+            if (type === 'jurisdiction') return '0.5px solid rgba(0,0,0,0.1)';
+            return undefined;
+        };
+
+        const isEdge = ownerBorders.top || ownerBorders.right || ownerBorders.bottom || ownerBorders.left;
+        // Adjusted corner radius for sleeker rounding
+        const cornerRadius = 10;
+        const borderRadiusStyle = cell.owner !== null ? {
+            borderTopLeftRadius: (ownerBorders.top && ownerBorders.left) ? cornerRadius : 0,
+            borderTopRightRadius: (ownerBorders.top && ownerBorders.right) ? cornerRadius : 0,
+            borderBottomLeftRadius: (ownerBorders.bottom && ownerBorders.left) ? cornerRadius : 0,
+            borderBottomRightRadius: (ownerBorders.bottom && ownerBorders.right) ? cornerRadius : 0,
+        } : {};
+
         return (
           <div key={`${x}-${y}`} onClick={() => cellClick(x, y)}
             style={{ 
               backgroundColor: cell.owner !== null && players[cell.owner] ? (
                 cell.type === 'capital' ? '#f59e0b' : 
                 cell.type === 'city' ? shadeColor(ownerColor, -80) : 
-                cell.control === 'capital' ? shadeColor(ownerColor, 40) : 
-                cell.control?.startsWith('city') ? shadeColor(ownerColor, 75) : 
-                shadeColor(ownerColor, 60)
+                (cell.control?.includes('captured') ? shadeColor(ownerColor, 130) : 
+                (cell.control === 'capital' ? shadeColor(ownerColor, 40) : 
+                 shadeColor(ownerColor, 75)))
               ) : undefined,
-              borderTop: borders.top ? '1.5px solid rgba(0,0,0,0.4)' : undefined,
-              borderRight: borders.right ? '1.5px solid rgba(0,0,0,0.4)' : undefined,
-              borderBottom: borders.bottom ? '1.5px solid rgba(0,0,0,0.4)' : undefined,
-              borderLeft: borders.left ? '1.5px solid rgba(0,0,0,0.4)' : undefined,
+              borderTop: getBorderStyle(borders.top),
+              borderRight: getBorderStyle(borders.right),
+              borderBottom: getBorderStyle(borders.bottom),
+              borderLeft: getBorderStyle(borders.left),
+              ...borderRadiusStyle,
+              boxShadow: (isEdge && cell.owner !== null) ? `inset 0 0 5px rgba(255,255,255,0.05), 0 0 10px ${players[cell.owner]?.color}22` : undefined,
             }}
-            className={`w-8 h-8 sm:w-11 sm:h-11 border border-slate-700/30 flex items-center justify-center text-[8px] sm:text-xs font-black cursor-pointer rounded-sm shrink-0 transition-all duration-200
-              ${isSelectable ? 'selectable-pulse border-white shadow-lg z-10' : ''}
-              ${cell.type === 'capital' ? 'ring-1 ring-yellow-400/50 shadow-lg shadow-yellow-500/10' : ''}
-              ${cell.owner === null ? 'bg-slate-900/40' : ''}`}
+            className={`w-8 h-8 sm:w-11 sm:h-11 flex items-center justify-center text-[8px] sm:text-xs font-black cursor-pointer rounded-sm shrink-0 transition-all duration-300 border-[0.5px] border-white/5 relative
+              ${isSelectable ? 'selectable-pulse border-white shadow-lg z-10 scale-105' : ''}
+              ${cell.type === 'capital' ? 'ring-1 ring-yellow-400/40 shadow-lg z-10' : ''}
+              ${cell.owner === null ? 'bg-slate-900/40 hover:bg-slate-800/40' : ''}`}
           >
-            {cell.type === 'capital' && cell.owner !== null && players[cell.owner] && <span className="text-yellow-950">{players[cell.owner].capitalLevel}</span>}
-            {cell.type === 'city' && <span className="opacity-80 text-white">{cell.level}</span>}
+            {cell.type === 'capital' && cell.owner !== null && players[cell.owner] && <span className="text-yellow-950 z-10">{players[cell.owner].capitalLevel}</span>}
+            {cell.type === 'city' && <span className="opacity-80 text-white z-10">{cell.level}</span>}
+            {isEdge && cell.owner !== null && <div className="absolute inset-0 border border-white/5 pointer-events-none" style={{...borderRadiusStyle}} />}
           </div>
         );
       })}
@@ -1175,7 +1246,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Diplomatic & Forced Treaty Modals optimized for Mobile */}
       {isMyTurn && (pendingTruceTarget !== null || (currentPlayer?.truceProposals?.size || 0) > 0) && (
         <div className="fixed inset-0 z-[250] bg-slate-950/80 backdrop-blur-2xl flex items-center justify-center p-6">
            <div className="max-w-md w-full bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 space-y-6 sm:space-y-8 animate-in zoom-in-95 duration-300 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
@@ -1187,7 +1257,11 @@ const App: React.FC = () => {
                     <p className="text-slate-400 text-sm font-bold leading-relaxed">{t('forceTruceDesc', { name: players[pendingTruceTarget]?.name })}</p>
                   </div>
                   <div className="flex flex-col gap-3 pt-2">
-                    <button onClick={() => { const nextP = establishTruce(currentIdx, pendingTruceTarget!, players); const nextLogs = addLog(currentIdx, t('truceForcedLog', { name: players[pendingTruceTarget!].name }), 'peace'); nextTurn(grid, nextP, nextLogs); }} className="w-full py-4 bg-cyan-600 text-white font-black rounded-2xl hover:bg-cyan-500 transition-all shadow-xl active:scale-95">{t('forceTruceAction')}</button>
+                    <button onClick={() => { 
+                        const truceRes = establishTruce(currentIdx, pendingTruceTarget!, players, grid); 
+                        const nextLogs = addLog(currentIdx, t('truceForcedLog', { name: players[pendingTruceTarget!].name }), 'peace'); 
+                        nextTurn(truceRes.grid, truceRes.players, nextLogs); 
+                    }} className="w-full py-4 bg-cyan-600 text-white font-black rounded-2xl hover:bg-cyan-500 transition-all shadow-xl active:scale-95">{t('forceTruceAction')}</button>
                     <button onClick={() => nextTurn(grid, players, logs)} className="w-full py-4 bg-slate-800 text-slate-400 font-bold rounded-2xl hover:bg-slate-700 transition-all active:scale-95">{t('continueWar')}</button>
                   </div>
                 </>
@@ -1208,7 +1282,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Sidebar for Desktop */}
       <aside className="hidden lg:flex w-72 bg-slate-900/40 backdrop-blur-3xl border-r border-white/5 flex-col z-20 shrink-0">
         <div className="p-8 border-b border-white/5 flex items-center gap-3"><Landmark className="w-6 h-6 text-yellow-500" /><h1 className="font-black tracking-tighter uppercase text-2xl">{t('title')}</h1></div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -1218,7 +1291,6 @@ const App: React.FC = () => {
       </aside>
 
       <section className="flex-1 flex flex-col relative overflow-hidden h-full">
-        {/* Mobile Header Nav */}
         <div className="lg:hidden flex bg-slate-950/90 backdrop-blur-xl border-b border-white/5 px-4 py-3 justify-between items-center z-50">
            <div className="flex items-center gap-2 font-black tracking-tighter uppercase text-xs sm:text-sm"><Landmark className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" /> {t('title')}</div>
            <div className="flex gap-2">
@@ -1230,16 +1302,14 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex-1 relative overflow-hidden flex flex-col">
-          {/* Main Map View - Optimized with loose scrolling */}
           <div className={`flex-1 overflow-auto touch-pan-x touch-pan-y z-10 scrollbar-hide ${mobileView === 'map' ? 'block' : 'hidden lg:block'}`}>
-            <div className="min-h-full min-w-full flex items-start sm:items-center justify-center p-6 sm:p-12 pb-[50vh] sm:pb-12 pt-20 sm:pt-12 px-20 sm:px-12">
-              <div className="min-w-max bg-slate-900/40 p-3 sm:p-6 rounded-[2rem] border border-white/5 shadow-2xl backdrop-blur-md">
+            <div className="min-h-full min-w-full flex items-start sm:items-center justify-center p-6 sm:p-12 pb-[60vh] sm:pb-12 pt-24 sm:pt-12 px-20 sm:px-12">
+              <div className="min-w-max bg-slate-900/60 p-4 sm:p-8 rounded-[2rem] border border-white/5 shadow-2xl backdrop-blur-2xl">
                  {renderGrid}
               </div>
             </div>
           </div>
 
-          {/* Intel View for Mobile */}
           {mobileView === 'status' && (
             <div className="lg:hidden flex-1 bg-slate-950 overflow-y-auto p-4 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="flex justify-between items-center mb-6"><h3 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">{t('civStatus')}</h3><div className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Year {gameTurn}</div></div>
@@ -1247,7 +1317,6 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* Logs View for Mobile */}
           {mobileView === 'logs' && (
             <div className="lg:hidden flex-1 bg-slate-950 overflow-y-auto p-4 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="flex justify-between items-center mb-6"><h3 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">{t('logs')}</h3></div>
@@ -1256,7 +1325,6 @@ const App: React.FC = () => {
           )}
         </div>
 
-        {/* Action Bar / HUD optimized for Mobile */}
         {phase === 'play' && mobileView === 'map' && (
           <div className="absolute bottom-4 sm:bottom-8 left-0 right-0 z-[60] flex flex-col items-center gap-3 sm:gap-4 w-full px-3 sm:px-4 animate-in slide-in-from-bottom-8 duration-500">
              {currentPlayer && (
@@ -1286,7 +1354,6 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* End Game Modal */}
         {phase === 'end' && (
           <div className="fixed inset-0 z-[300] bg-slate-950/95 backdrop-blur-3xl flex items-center justify-center p-6">
             <div className="max-w-md w-full bg-slate-900 border border-white/10 rounded-[2.5rem] sm:rounded-[3rem] p-10 sm:p-12 text-center space-y-6 sm:space-y-8 animate-in zoom-in-95 duration-500 shadow-2xl">
@@ -1301,7 +1368,6 @@ const App: React.FC = () => {
         )}
       </section>
 
-      {/* Logs Sidebar for Desktop */}
       <aside className="hidden lg:flex w-80 bg-slate-900/40 backdrop-blur-3xl border-l border-white/5 flex-col z-20 shrink-0">
         <div className="p-8 border-b border-white/5"><h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">{t('logs')}</h3></div>
         <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin"><LogChronicle logs={logs} players={players} t={t} /></div>
