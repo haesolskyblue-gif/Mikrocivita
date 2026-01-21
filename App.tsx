@@ -4,7 +4,7 @@ import {
   Trophy, Shield, Sword, Swords, Map as MapIcon, 
   Building2, FastForward, Users, 
   Bird, Globe, RotateCcw, SquareArrowUp, Star, Landmark, ChevronRight, Play, Sparkles,
-  Link as LinkIcon, Copy, UserPlus, Zap, LayoutGrid, List, Github, Twitter, MessageSquare, ChevronDown, Monitor, Cpu, Handshake, XCircle, Palette, User, Settings, BookOpen, Info
+  Link as LinkIcon, Copy, UserPlus, Zap, LayoutGrid, List, Github, Twitter, MessageSquare, ChevronDown, Monitor, Cpu, Handshake, XCircle, Palette, User, Settings, BookOpen, Info, Lock, Unlock, Hash, Search
 } from 'lucide-react';
 import { Player, Cell, GamePhase, GameLogEntry, PlayerID, GameMode } from './types.ts';
 // @ts-ignore
@@ -39,22 +39,9 @@ const TRANSLATIONS = {
     heroDesc: "A polished turn-based strategy game where players build civilizations, expand territories, and engage in diplomacy or war to achieve global dominance.",
     playNow: "Tutorial / Trial",
     playOnline: "Online Lobby",
-    features: "Features",
-    f1: "Deep Strategy",
-    f1d: "Every tile matters. Manage your territory limits wisely and out-think your rivals.",
-    f2: "Dynamic Warfare",
-    f2d: "Victory isn't just luck. Your tech score determines your military prowess.",
-    f3: "Grand Diplomacy",
-    f3d: "Forge lasting truces or use peace as a weapon to consolidate power.",
-    howToTitle: "How to Build an Empire",
-    step1: "Found Your Capital",
-    step1d: "Pick a strategic starting point. This is the heart of your nation.",
-    step2: "Expand Borders",
-    step2d: "Grow around your cities. Each building has a natural expansion limit.",
-    step3: "Unite the Globe",
-    step3d: "Through tech or force, bring every civilization under your banner.",
     start: "Start Tutorial",
-    players: "Empire Count",
+    startOnlineGame: "Start the Civ", // New translation key for online host button
+    players: "Max Civs",
     turn: "Year",
     eliminated: "Eliminated",
     capLv: "Lv.{lv} Capital",
@@ -72,7 +59,6 @@ const TRANSLATIONS = {
     invade: "Invasion",
     truce: "Peace Treaty",
     endTurn: "Next Year",
-    skipTurn: "Wait",
     initLog: "A new era begins. Establish your seat of power.",
     placeCap: "🏛️ Select your Capital's foundation tile.",
     warLog: "War declared on {name}!",
@@ -113,10 +99,10 @@ const TRANSLATIONS = {
     capital: "Capital",
     city: "Colony",
     noEnemyInvade: "No enemy in range!",
-    multiplayer: "Global Lobby",
+    multiplayer: "Online Servers",
     createRoom: "Create Room",
     joinRoom: "Join Room",
-    roomID: "Room ID",
+    roomID: "Direct Room ID",
     connecting: "Connecting...",
     waitingPlayers: "Waiting for other empires...",
     imReady: "Ready for War",
@@ -143,7 +129,16 @@ const TRANSLATIONS = {
     tut1: "Foundation: Place your Capital. It must be at least 5 tiles away from rivals. This is the heart of your Score.",
     tut2: "Expansion: Use 'Expand' to claim land. Capitals have a 25-tile limit; Colonies have 10. Integrated land yields 3pts/tile.",
     tut3: "Invasion & Exclaves: Attacking takes land. But 'Captured' land (exclaves) is unstable: 50% less defense and only 1pt/tile.",
-    tut4: "Consolidation: Use Peace Treaties to absorb captured land into stable territory. A Lv.10 Capital wins a Tech Victory!"
+    tut4: "Consolidation: Use Peace Treaties to absorb captured land into stable territory. A Lv.10 Capital wins a Tech Victory!",
+    publicLobby: "Public Lobby",
+    privateRoom: "Private Session",
+    roomName: "Room Name",
+    privacy: "Visibility",
+    public: "Public",
+    private: "Private",
+    noRooms: "No public warzones found.",
+    refresh: "Refresh Intel",
+    roomNamePrefix: "Global Conquest"
   },
   ko: {
     title: "미크로시비타",
@@ -153,22 +148,9 @@ const TRANSLATIONS = {
     heroDesc: "정교한 턴제 전략을 통해 나만의 문명을 건설하고, 영토를 확장하며, 외교와 전쟁으로 세계의 정점에 올라서세요.",
     playNow: "튜토리얼 / 연습",
     playOnline: "온라인 로비",
-    features: "특징",
-    f1: "심도 있는 전략",
-    f1d: "모든 타일이 전략의 핵심입니다. 영토 제한을 고려하여 효율적으로 확장하세요.",
-    f2: "역동적인 전쟁",
-    f2d: "문명의 종합 발전 수준이 곧 군사력입니다. 압도적인 국력으로 적을 굴복시키세요.",
-    f3: "거대 외교",
-    f3d: "때로는 칼보다 말이 강력합니다. 휴전을 통해 힘을 비축하거나 세력을 규합하세요.",
-    howToTitle: "제국 건설 가이드",
-    step1: "수도 정초",
-    step1d: "전략적 요충지를 선택하세요. 국가의 심장이 될 곳입니다.",
-    step2: "영토 확장",
-    step2d: "주변을 개척하세요. 각 거점은 고유의 확장 한계를 가집니다.",
-    step3: "세계 통일",
-    step3d: "기술력 혹은 무력을 통해 모든 문명을 당신의 깃발 아래 두십시오.",
     start: "튜토리얼 시작",
-    players: "참여 문명 수",
+    startOnlineGame: "문명 시작", // New translation key for online host button
+    players: "최대 문명",
     turn: "연도",
     eliminated: "멸망함",
     capLv: "수도 레벨 {lv}",
@@ -186,7 +168,6 @@ const TRANSLATIONS = {
     invade: "군사 침공",
     truce: "휴전 제안",
     endTurn: "다음 연도",
-    skipTurn: "대기",
     initLog: "새로운 시대의 서막이 올랐습니다. 수도를 건설하십시오.",
     placeCap: "🏛️ 수도를 건설할 타일을 선택하십시오.",
     warLog: "{name}에게 전쟁을 선포했습니다",
@@ -227,10 +208,10 @@ const TRANSLATIONS = {
     capital: "수도",
     city: "도시",
     noEnemyInvade: "사거리 내에 적대적인 영토가 없습니다!",
-    multiplayer: "멀티플레이어 대기실",
+    multiplayer: "온라인 서버",
     createRoom: "방 만들기",
     joinRoom: "참가하기",
-    roomID: "방 코드",
+    roomID: "방 코드 입력",
     connecting: "연결 중...",
     waitingPlayers: "다른 문명을 기다리는 중...",
     imReady: "준비 완료",
@@ -257,7 +238,16 @@ const TRANSLATIONS = {
     tut1: "정초: 수도를 건설하세요. 적국과 최소 5타일 거리를 유지해야 합니다. 수도는 발전도(점수)의 핵심입니다.",
     tut2: "확장: '영토 확장'을 통해 땅을 개척하세요. 수도는 25타일, 도시는 10타일까지 가능하며 편입된 땅은 타일당 3점입니다.",
     tut3: "침공과 외지: 적을 공격해 땅을 뺏으세요. 하지만 '점령지(외지)'는 불안정합니다: 방어력이 50% 낮고 점수는 타일당 1점뿐입니다.",
-    tut4: "공고화: 휴전 협정을 통해 점령지를 완전한 영토로 편입하세요. 수도 10레벨 달성 시 기술 승리를 거둡니다!"
+    tut4: "공고화: 휴전 협정을 통해 점령지를 완전한 영토로 편입하세요. 수도 10레벨 달성 시 기술 승리를 거둡니다!",
+    publicLobby: "공개 로비",
+    privateRoom: "비공개 세션",
+    roomName: "방 이름",
+    privacy: "공개 여부",
+    public: "전체 공개",
+    private: "암호화(비공개)",
+    noRooms: "참여 가능한 공개 작전이 없습니다.",
+    refresh: "정보 갱신",
+    roomNamePrefix: "작전 구역"
   }
 };
 
@@ -344,7 +334,7 @@ const CivilizationIntel = ({ players, currentIdx, grid, t, getPlayerScore, myPla
           <div className="flex justify-between items-center mb-3">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
-              <span className="font-black text-xs truncate max-w-[120px]" style={{ color: p.color }}>{p.name}</span>
+              <span className="font-black text-xs truncate max-w-[120px]" style={{ color: p.name === `Civ ${p.id + 1}` || p.name === `문명 ${p.id + 1}` ? 'currentColor' : p.color }}>{p.name}</span>
               {mode === 'online' && myPlayerId === p.id && <Monitor className="w-3 h-3 text-cyan-500"/>}
             </div>
             <div className="flex items-center gap-1 bg-slate-950/50 px-2 py-0.5 rounded-full text-[9px] font-black text-yellow-500 border border-white/5"><Star className="w-3 h-3"/> {getPlayerScore(p.id, players, grid)}</div>
@@ -395,7 +385,9 @@ const App: React.FC = () => {
   const [logs, setLogs] = useState<GameLogEntry[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<((x: number, y: number) => void) | null>(null);
-  const [selectableCells, setSelectableCells] = useState<Set<string>>(new Set());
+  // Fix: Correctly initialize selectableCells with useState to hold a Set<string>.
+  // This addresses potential type inference issues that could lead to "Property 'has' does not exist on type 'string'"
+  const [selectableCells, setSelectableCells] = useState<Set<string>>(new Set<string>()); 
   const [gridSize, setGridSize] = useState<number>(15);
   const [expansionRemaining, setExpansionRemaining] = useState<number>(0);
   const [mobileView, setMobileView] = useState<MobileView>('map');
@@ -405,13 +397,17 @@ const App: React.FC = () => {
   const [isTutorial, setIsTutorial] = useState<boolean>(false);
   const [tutStep, setTutStep] = useState<number>(0);
 
+  // Multiplayer Room States
+  const [roomName, setRoomName] = useState<string>('New World Era');
+  const [isPublic, setIsPublic] = useState<boolean>(true);
   const [peer, setPeer] = useState<any>(null);
   const [roomId, setRoomId] = useState<string>('');
   const [connections, setConnections] = useState<any[]>([]);
   const [isHost, setIsHost] = useState<boolean>(false);
   const [myPlayerId, setMyPlayerId] = useState<number | null>(null);
   const [joinId, setJoinId] = useState<string>('');
-  const [onlineStatus, setOnlineStatus] = useState<'idle' | 'connecting' | 'lobby'>('idle');
+  const [onlineStatus, setOnlineStatus] = useState<'idle' | 'connecting' | 'lobby' | 'discovery'>('idle');
+  const [publicRooms, setPublicRooms] = useState<Array<{ id: string, name: string, currentPlayers: number, maxPlayers: number, hostName: string }>>([]);
 
   const connectionsRef = useRef<any[]>([]);
   const isHostRef = useRef<boolean>(false);
@@ -480,6 +476,12 @@ const App: React.FC = () => {
     setTimeout(() => setMessage(null), 3000);
   }, []);
 
+  /**
+   * Synchronizes the game state across connected peers.
+   * This function is called by the host to broadcast state to clients,
+   * or by clients (e.g., for lobby updates or tool responses) to send state to the host.
+   * A full state synchronization approach is used to ensure consistency.
+   */
   const syncGameState = (updatedPlayers: Player[], updatedGrid: Cell[][], updatedCurrentIdx: number, updatedTurn: number, updatedPhase: GamePhase, updatedLogs: GameLogEntry[]) => {
     if (mode === 'online') {
       const payload = {
@@ -494,6 +496,7 @@ const App: React.FC = () => {
       if (isHostRef.current) {
         connectionsRef.current.forEach(conn => conn.send(msg));
       } else if (connectionsRef.current.length > 0) {
+        // In client role, send to the host (first connection)
         connectionsRef.current[0].send(msg);
       }
     }
@@ -581,7 +584,6 @@ const App: React.FC = () => {
       truceTurns: { ...pl.truceTurns },
       truceProposals: new Set(pl.truceProposals)
     }))];
-    
     [p1Id, p2Id].forEach(id => {
       const other = id === p1Id ? p2Id : p1Id;
       nextP[id].warWith.delete(other);
@@ -589,14 +591,9 @@ const App: React.FC = () => {
       nextP[id].truceTurns[other] = 4;
       nextP[id].truceProposals.delete(other);
     });
-
     const nextGrid = [...currentGrid.map(row => [...row])];
     [p1Id, p2Id].forEach(pid => {
-        const hubs = [
-            { id: 'capital', x: nextP[pid].capital!.x, y: nextP[pid].capital!.y },
-            ...nextP[pid].cities.map(c => ({ id: c.id, x: c.x, y: c.y }))
-        ];
-
+        const hubs = [{ id: 'capital', x: nextP[pid].capital!.x, y: nextP[pid].capital!.y }, ...nextP[pid].cities.map(c => ({ id: c.id, x: c.x, y: c.y }))];
         nextGrid.forEach((row, gy) => row.forEach((cell, gx) => {
             if (cell.owner === pid && cell.control?.includes('captured')) {
                 let nearestHub = hubs[0];
@@ -609,18 +606,15 @@ const App: React.FC = () => {
             }
         }));
     });
-    
     return { players: nextP, grid: nextGrid };
   };
 
   const nextTurn = (updatedGrid?: Cell[][], updatedPlayers?: Player[], updatedLogs?: GameLogEntry[]) => {
     if (phaseRef.current === 'end') return;
     if (!isMyTurn && mode === 'online') return;
-    
     const finalGrid = updatedGrid || gridRef.current;
     let finalLogs = updatedLogs || logsRef.current;
     const workingPlayers = [...(updatedPlayers || playersRef.current)];
-    
     const p = { ...workingPlayers[currentIdxRef.current] };
     if (p.capitalUpgrade) {
       const up = { ...p.capitalUpgrade, remaining: p.capitalUpgrade.remaining - 1 };
@@ -628,11 +622,8 @@ const App: React.FC = () => {
         p.capitalLevel = up.targetLevel;
         p.capitalUpgrade = null;
         finalLogs = addLog(p.id, t('growthLog', { lv: p.capitalLevel }), 'growth', finalLogs);
-      } else { 
-        p.capitalUpgrade = up; 
-      }
+      } else { p.capitalUpgrade = up; }
     }
-    
     const newTruceTurns = { ...p.truceTurns };
     const newTruceWith = new Set(p.truceWith);
     Object.entries(newTruceTurns).forEach(([enemyIdStr, turns]) => {
@@ -651,79 +642,42 @@ const App: React.FC = () => {
     });
     p.truceTurns = newTruceTurns; p.truceWith = newTruceWith;
     workingPlayers[currentIdxRef.current] = p;
-
     const winResult = checkWinCondition(workingPlayers, finalLogs);
     const finalPhase = winResult.phase;
     finalLogs = winResult.logs;
-
     setPendingAction(null); setSelectableCells(new Set()); setExpansionRemaining(0); setPendingTruceTarget(null);
-    
     let nextIdx = (currentIdxRef.current + 1) % playerCount;
     const areThereSurvivors = workingPlayers.some((pl, idx) => !pl.eliminated && pl.name && idx !== currentIdxRef.current);
-    if (areThereSurvivors) {
-        while (workingPlayers[nextIdx] && (workingPlayers[nextIdx].eliminated || !workingPlayers[nextIdx].name)) { 
-            nextIdx = (nextIdx + 1) % playerCount; 
-        }
-    }
-    
+    if (areThereSurvivors) { while (workingPlayers[nextIdx] && (workingPlayers[nextIdx].eliminated || !workingPlayers[nextIdx].name)) { nextIdx = (nextIdx + 1) % playerCount; } }
     let nextTurnNum = turnRef.current;
-    if (nextIdx === 0) {
-        nextTurnNum = turnRef.current + 1;
-        setGameTurn(nextTurnNum);
-    }
-
-    setPlayers(workingPlayers);
-    setGrid(finalGrid);
-    setLogs(finalLogs);
-    setCurrentIdx(nextIdx);
-    setPhase(finalPhase);
-
+    if (nextIdx === 0) { nextTurnNum = turnRef.current + 1; setGameTurn(nextTurnNum); }
+    setPlayers(workingPlayers); setGrid(finalGrid); setLogs(finalLogs); setCurrentIdx(nextIdx); setPhase(finalPhase);
     if (isTutorial && nextTurnNum === 2 && tutStep === 1) setTutStep(2);
     if (isTutorial && nextTurnNum === 4 && tutStep === 2) setTutStep(3);
-    
-    if (mode === 'online') {
-        syncGameState(workingPlayers, finalGrid, nextIdx, nextTurnNum, finalPhase, finalLogs);
-    }
+    if (mode === 'online') { syncGameState(workingPlayers, finalGrid, nextIdx, nextTurnNum, finalPhase, finalLogs); }
   };
 
   const cellClick = (x: number, y: number) => {
     if (!isMyTurn) return;
     if (phaseRef.current === 'setup') {
       if (gridRef.current[y][x].owner !== null) return;
-      
       let tooClose = false;
-      playersRef.current.forEach(p => {
-        if (p.capital) {
-          const dist = Math.max(Math.abs(p.capital.x - x), Math.abs(p.capital.y - y));
-          if (dist < 5) tooClose = true;
-        }
-      });
+      playersRef.current.forEach(p => { if (p.capital) { const dist = Math.max(Math.abs(p.capital.x - x), Math.abs(p.capital.y - y)); if (dist < 5) tooClose = true; } });
       if (tooClose) { showMessage(t('tooCloseCap')); return; }
-
       const newGrid = [...gridRef.current.map(row => [...row])];
       const newPlayers = [...playersRef.current.map(p => ({ ...p, territory: new Set(p.territory), originalTerritories: new Set(p.originalTerritories) }))];
       const p = { ...newPlayers[currentIdxRef.current] };
-      p.capital = { x, y };
-      p.territory.add(`${y},${x}`);
-      p.originalTerritories.add(`${y},${x}`);
+      p.capital = { x, y }; p.territory.add(`${y},${x}`); p.originalTerritories.add(`${y},${x}`);
       newGrid[y][x] = { owner: currentIdxRef.current, type: 'capital', control: 'capital', level: 1 };
       claimAround(currentIdxRef.current, x, y, 1, newPlayers, newGrid);
       newPlayers[currentIdxRef.current] = p;
-      
       const survivorsCount = newPlayers.filter(pl => pl.name).length;
       const isLastPlayer = currentIdxRef.current === survivorsCount - 1;
       const nextPhase = isLastPlayer ? 'play' : 'setup';
       const nextIdx = isLastPlayer ? 0 : currentIdxRef.current + 1;
-
       let finalLogs = logsRef.current;
-      if (isLastPlayer) {
-          finalLogs = addLog(-1, t('struggleStart'), 'info');
-          setPhase('play');
-      }
-      
-      setGrid(newGrid);
-      setPlayers(newPlayers);
-      setCurrentIdx(nextIdx);
+      if (isLastPlayer) { finalLogs = addLog(-1, t('struggleStart'), 'info'); setPhase('play'); }
+      setGrid(newGrid); setPlayers(newPlayers); setCurrentIdx(nextIdx);
       syncGameState(newPlayers, newGrid, nextIdx, turnRef.current, nextPhase, finalLogs);
     } else if (phaseRef.current === 'play' && pendingAction) { pendingAction(x, y); }
   };
@@ -742,9 +696,7 @@ const App: React.FC = () => {
           p.cities.forEach(c => { if (Math.max(Math.abs(c.x - x), Math.abs(c.y - y)) < 2) tooClose = true; });
         });
         if (near && !tooClose) validSpots.add(`${y},${x}`);
-      } else if (cell.owner === currentIdxRef.current && cell.type === 'city') {
-        validSpots.add(`${y},${x}`);
-      }
+      } else if (cell.owner === currentIdxRef.current && cell.type === 'city') { validSpots.add(`${y},${x}`); }
     }));
     if (validSpots.size === 0) { showMessage(t('tooCloseCity')); return; }
     setSelectableCells(validSpots); showMessage(t('pickCity'));
@@ -763,12 +715,9 @@ const App: React.FC = () => {
         newGrid[y][x] = { owner: currentIdxRef.current, type: 'city', control: cityId, level: 1 };
         const newPlayers = [...playersRef.current.map(pl => ({ ...pl, territory: new Set(pl.territory), originalTerritories: new Set(pl.originalTerritories) }))];
         const p = { ...newPlayers[currentIdxRef.current] };
-        p.cities = [...p.cities, { x, y, id: cityId }];
-        p.territory.add(key);
-        p.originalTerritories.add(key);
+        p.cities = [...p.cities, { x, y, id: cityId }]; p.territory.add(key); p.originalTerritories.add(key);
         newPlayers[currentIdxRef.current] = p;
-        const newLogs = addLog(currentIdxRef.current, t('cityLog'), 'growth');
-        nextTurn(newGrid, newPlayers, newLogs);
+        const newLogs = addLog(currentIdxRef.current, t('cityLog'), 'growth'); nextTurn(newGrid, newPlayers, newLogs);
       }
     });
   };
@@ -777,10 +726,7 @@ const App: React.FC = () => {
     if (!isMyTurn) return;
     if (currentPlayer.warWith.size > 0) { showMessage(t('warRestrict')); return; }
     showMessage(t('pickCenter'));
-    const centers = [
-      { id: 'capital', name: t('capital'), x: currentPlayer.capital!.x, y: currentPlayer.capital!.y, limit: 25 },
-      ...currentPlayer.cities.map(c => ({ id: c.id, name: t('city'), x: c.x, y: c.y, limit: 10 }))
-    ];
+    const centers = [{ id: 'capital', name: t('capital'), x: currentPlayer.capital!.x, y: currentPlayer.capital!.y, limit: 25 }, ...currentPlayer.cities.map(c => ({ id: c.id, name: t('city'), x: c.x, y: c.y, limit: 10 }))];
     setSelectableCells(new Set(centers.map(c => `${c.y},${c.x}`)));
     setPendingAction(() => (x: number, y: number) => {
       const center = centers.find(c => c.x === x && c.y === y);
@@ -800,14 +746,9 @@ const App: React.FC = () => {
         const newGrid = [...gridRef.current.map(r => [...r])];
         const newPlayers = [...playersRef.current.map(pl => ({ ...pl, territory: new Set(pl.territory) }))];
         const p = { ...newPlayers[currentIdxRef.current] };
-        frontier.forEach(key => {
-          const [fy, fx] = key.split(',').map(Number);
-          newGrid[fy][fx] = { owner: currentIdxRef.current, type: 'land', control: center.id, level: 1 };
-          p.territory.add(key);
-        });
+        frontier.forEach(key => { const [fy, fx] = key.split(',').map(Number); newGrid[fy][fx] = { owner: currentIdxRef.current, type: 'land', control: center.id, level: 1 }; p.territory.add(key); });
         newPlayers[currentIdxRef.current] = p;
-        const newLogs = addLog(currentIdxRef.current, t('expandLog', { center: center.name, n: frontier.length }));
-        nextTurn(newGrid, newPlayers, newLogs);
+        const newLogs = addLog(currentIdxRef.current, t('expandLog', { center: center.name, n: frontier.length })); nextTurn(newGrid, newPlayers, newLogs);
       } else {
         setExpansionRemaining(capacityLeft); setSelectableCells(new Set(frontier)); showMessage(t('manualExpand', { n: capacityLeft }));
         setPendingAction(() => (mx: number, my: number) => {
@@ -815,17 +756,10 @@ const App: React.FC = () => {
           const newGrid = [...gridRef.current.map(r => [...r])];
           newGrid[my][mx] = { owner: currentIdxRef.current, type: 'land', control: center.id, level: 1 };
           const newPlayers = [...playersRef.current.map(pl => ({ ...pl, territory: new Set(pl.territory) }))];
-          const p = { ...newPlayers[currentIdxRef.current] };
-          p.territory.add(mKey);
-          newPlayers[currentIdxRef.current] = p;
-          setGrid(newGrid);
-          setPlayers(newPlayers);
+          const p = { ...newPlayers[currentIdxRef.current] }; p.territory.add(mKey); newPlayers[currentIdxRef.current] = p;
+          setGrid(newGrid); setPlayers(newPlayers);
           setExpansionRemaining(prev => { 
-              if (prev - 1 <= 0) { 
-                  const newLogs = addLog(currentIdxRef.current, t('expandLog', { center: center.name, n: capacityLeft })); 
-                  setTimeout(() => nextTurn(newGrid, newPlayers, newLogs), 10); 
-                  return 0; 
-              } 
+              if (prev - 1 <= 0) { const newLogs = addLog(currentIdxRef.current, t('expandLog', { center: center.name, n: capacityLeft })); setTimeout(() => nextTurn(newGrid, newPlayers, newLogs), 10); return 0; } 
               return prev - 1; 
           });
           setSelectableCells(prev => { const ns = new Set(prev); ns.delete(mKey); return ns; });
@@ -918,9 +852,9 @@ const App: React.FC = () => {
     if (!isMyTurn) return;
     let nextP = playersRef.current; let nextGrid = gridRef.current; let nextLogs = logsRef.current;
     if (accept) {
-      const truceRes = establishTruce(currentIdxRef.current, proposingPlayerId, playersRef.current, gridRef.current);
+      const truceRes = establishTruce(currentIdx, proposingPlayerId, playersRef.current, gridRef.current);
       nextP = truceRes.players; nextGrid = truceRes.grid;
-      nextLogs = addLog(currentIdxRef.current, t('truceAcceptLog', { p1: currentPlayer.name, p2: players[proposingPlayerId].name }), 'peace');
+      nextLogs = addLog(currentIdx, t('truceAcceptLog', { p1: currentPlayer.name, p2: players[proposingPlayerId].name }), 'peace');
     } else {
       nextP = [...playersRef.current.map(pl => ({ ...pl, truceProposals: new Set(pl.truceProposals) }))];
       nextP[currentIdxRef.current].truceProposals.delete(proposingPlayerId);
@@ -930,64 +864,82 @@ const App: React.FC = () => {
     syncGameState(nextP, nextGrid, currentIdxRef.current, turnRef.current, phaseRef.current, nextLogs);
   };
 
-  const resetToLanding = () => { if (peer) peer.destroy(); setUiState('landing'); setPlayers([]); setGrid([]); setPhase('setup'); setGameTurn(1); setLogs([]); setCurrentIdx(0); setConnections([]); setPeer(null); setOnlineStatus('idle'); setMobileView('map'); setIsTutorial(false); setTutStep(0); };
+  const updateProfile = (name: string, color: string) => {
+    if (myPlayerId === null) return;
+    setPlayers(prev => {
+      const next = [...prev];
+      next[myPlayerId] = { ...next[myPlayerId], name, color };
+      if (mode === 'online') {
+        const msg = { type: 'LOBBY_UPDATE', payload: { players: next.map(serializePlayer) } };
+        // If host, broadcast to all clients. If client, send to host.
+        if (isHost) connections.forEach(c => c.send(msg));
+        else if (connections.length > 0) connections[0].send(msg);
+      }
+      return next;
+    });
+  };
 
-  // Helper for handling incoming peer data in online mode
+  const resetToLanding = () => { if (peer) peer.destroy(); setUiState('landing'); setPlayers([]); setGrid([]); setPhase('setup'); setGameTurn(1); setLogs([]); setCurrentIdx(0); setConnections([]); setPeer(null); setOnlineStatus('idle'); setMobileView('map'); setIsTutorial(false); setTutStep(0); setRoomName('New World Era'); setIsPublic(true); setPublicRooms([]); };
+
+  // Mock public rooms data for UI demonstration
+  const getMockPublicRooms = useCallback(() => {
+    // Removed hardcoded mock rooms. In a real app, this would fetch from a backend.
+    return []; 
+  }, []);
+
+  useEffect(() => {
+    if (onlineStatus === 'discovery') {
+        setPublicRooms(getMockPublicRooms());
+    }
+  }, [onlineStatus, getMockPublicRooms]); // Refresh mock rooms when language or status changes
+
+  /**
+   * Handles incoming peer data, parsing the message type and updating state accordingly.
+   * This central handler is crucial for maintaining synchronization in online mode.
+   */
   const handlePeerData = useCallback((data: any) => {
     switch (data.type) {
       case 'LOBBY_UPDATE':
+        // Updates lobby specific information, like player list and their details.
+        // If host, re-broadcasts the updated lobby state to all connected clients.
         if (data.payload.myId !== undefined) setMyPlayerId(data.payload.myId);
         if (data.payload.players) {
           setPlayers(data.payload.players.map(deserializePlayer));
-          if (isHostRef.current) {
-             connectionsRef.current.forEach(c => c.send({ type: 'LOBBY_UPDATE', payload: { players: data.payload.players } }));
-          }
+          if (isHostRef.current) { connectionsRef.current.forEach(c => c.send({ type: 'LOBBY_UPDATE', payload: { players: data.payload.players } })); }
         }
         break;
       case 'START_GAME':
+        // Signals clients that the game is starting and sets their player ID.
         if (data.myId !== undefined) setMyPlayerId(data.myId);
-        setUiState('game');
-        setPhase('setup');
+        setUiState('game'); setPhase('setup');
         break;
       case 'SYNC_STATE':
+        // Receives a full snapshot of the game state and updates all relevant state variables.
+        // This is a robust way to ensure clients are always in sync with the host's game state.
         const { players: p, grid: g, currentIdx: ci, turn: t, phase: ph, logs: l } = data.payload;
-        setPlayers(p.map(deserializePlayer));
-        setGrid(g);
-        setCurrentIdx(ci);
-        setGameTurn(t);
-        setPhase(ph);
-        setLogs(l);
+        setPlayers(p.map(deserializePlayer)); setGrid(g); setCurrentIdx(ci); setGameTurn(t); setPhase(ph); setLogs(l);
         break;
+      // Add more cases here for other network messages (e.g., chat, specific actions if not using full state sync)
+      default:
+        console.warn('Received unknown peer data type:', data.type, data);
     }
   }, []);
 
-  // Initialize as host
   const handleHost = useCallback(() => {
     setOnlineStatus('connecting');
-    // @ts-ignore
     const p = new Peer();
     p.on('open', (id: string) => {
-      setRoomId(id);
-      setIsHost(true);
-      setMyPlayerId(0);
-      setOnlineStatus('lobby');
-      setPeer(p);
+      setRoomId(id); setIsHost(true); setMyPlayerId(0); setOnlineStatus('lobby'); setPeer(p);
       setPlayers([{
-        id: 0,
-        name: lang === 'ko' ? '방장' : 'Host',
-        color: DEFAULT_COLORS[0],
-        capital: null,
-        capitalLevel: 1,
-        capitalUpgrade: null,
-        cities: [],
-        territory: new Set<string>(),
-        originalTerritories: new Set<string>(),
-        warWith: new Set<PlayerID>(),
-        truceWith: new Set<PlayerID>(),
-        truceTurns: {},
-        truceProposals: new Set<PlayerID>(),
-        eliminated: false,
+        id: 0, name: playersRef.current[0]?.name || (lang === 'ko' ? '방장' : 'Host'), color: playersRef.current[0]?.color || DEFAULT_COLORS[0],
+        capital: null, capitalLevel: 1, capitalUpgrade: null, cities: [], territory: new Set<string>(), originalTerritories: new Set<string>(), warWith: new Set<PlayerID>(), truceWith: new Set<PlayerID>(), truceTurns: {}, truceProposals: new Set<PlayerID>(), eliminated: false,
       }]);
+
+      if (isPublic) {
+          // In a real application, this would send a message to a discovery server
+          // to register the public room. For this P2P setup, we mock it locally for UI.
+          // setPublicRooms(prev => [...prev, { id: id, name: roomName, currentPlayers: 1, maxPlayers: playerCount, hostName: playersRef.current[0]?.name || (lang === 'ko' ? '방장' : 'Host') }]);
+      }
     });
     p.on('connection', (conn: any) => {
       conn.on('open', () => {
@@ -995,20 +947,7 @@ const App: React.FC = () => {
         setPlayers(prev => {
           const newId = prev.length;
           const nextPlayers = [...prev, {
-            id: newId,
-            name: lang === 'ko' ? `참가자 ${newId}` : `Challenger ${newId}`,
-            color: DEFAULT_COLORS[newId % DEFAULT_COLORS.length],
-            capital: null,
-            capitalLevel: 1,
-            capitalUpgrade: null,
-            cities: [],
-            territory: new Set<string>(),
-            originalTerritories: new Set<string>(),
-            warWith: new Set<PlayerID>(),
-            truceWith: new Set<PlayerID>(),
-            truceTurns: {},
-            truceProposals: new Set<PlayerID>(),
-            eliminated: false,
+            id: newId, name: lang === 'ko' ? `참가자 ${newId}` : `Challenger ${newId}`, color: DEFAULT_COLORS[newId % DEFAULT_COLORS.length], capital: null, capitalLevel: 1, capitalUpgrade: null, cities: [], territory: new Set<string>(), originalTerritories: new Set<string>(), warWith: new Set<PlayerID>(), truceWith: new Set<PlayerID>(), truceTurns: {}, truceProposals: new Set<PlayerID>(), eliminated: false,
           }];
           conn.send({ type: 'LOBBY_UPDATE', payload: { players: nextPlayers.map(serializePlayer), myId: newId } });
           connectionsRef.current.forEach(c => c.send({ type: 'LOBBY_UPDATE', payload: { players: nextPlayers.map(serializePlayer) } }));
@@ -1017,21 +956,20 @@ const App: React.FC = () => {
       });
       conn.on('data', handlePeerData);
     });
-  }, [lang, handlePeerData]);
+  }, [lang, isPublic, roomName, playerCount, players, handlePeerData]);
 
-  // Join an existing room
-  const handleJoin = useCallback(() => {
-    if (!joinId) return;
+  const handleJoin = useCallback((targetId?: string) => {
+    const id = targetId || joinId;
+    if (!id) return;
     setOnlineStatus('connecting');
-    // @ts-ignore
     const p = new Peer();
     p.on('open', () => {
       setPeer(p);
-      const conn = p.connect(joinId);
-      conn.on('open', () => {
-        setConnections([conn]);
-        setIsHost(false);
-        setOnlineStatus('lobby');
+      const conn = p.connect(id);
+      conn.on('open', () => { 
+        setConnections([conn]); 
+        setIsHost(false); 
+        setOnlineStatus('lobby'); 
       });
       conn.on('data', handlePeerData);
     });
@@ -1131,80 +1069,158 @@ const App: React.FC = () => {
 
   if (uiState === 'online_setup') {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 sm:p-8 text-white">
-        <div className="max-w-4xl w-full space-y-6 sm:space-y-8">
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 sm:p-8 text-white overflow-y-auto">
+        <div className="max-w-5xl w-full space-y-6 sm:space-y-10">
           <div className="text-center space-y-2">
             <Globe className="w-12 h-12 sm:w-16 sm:h-16 mx-auto text-cyan-400 animate-pulse" />
             <h2 className="text-3xl sm:text-5xl font-black uppercase tracking-tighter">{t('multiplayer')}</h2>
+            <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] sm:text-xs">Connect to global warzones</p>
           </div>
-          {onlineStatus === 'idle' ? (
-            <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
-              <button onClick={handleHost} className="p-6 sm:p-8 bg-slate-900/80 border border-slate-800 rounded-3xl hover:bg-slate-800 transition-all text-left space-y-4 group">
-                <UserPlus className="w-8 h-8 sm:w-10 sm:h-10 text-yellow-500 group-hover:scale-110 transition-transform" />
-                <div><h3 className="text-xl sm:text-2xl font-bold">{t('createRoom')}</h3><p className="text-slate-500 text-xs sm:text-sm">Forge a new world arena.</p></div>
-              </button>
-              <div className="p-6 sm:p-8 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-4">
-                <LinkIcon className="w-8 h-8 sm:w-10 sm:h-10 text-cyan-500" />
-                <input value={joinId} onChange={e => setJoinId(e.target.value)} placeholder={t('roomID')} className="w-full bg-slate-950 border border-slate-800 p-3 sm:p-4 rounded-xl font-bold outline-none focus:ring-2 ring-cyan-500/50" />
-                <button onClick={handleJoin} className="w-full py-3 sm:py-4 bg-cyan-600 hover:bg-cyan-500 rounded-xl font-black transition-all shadow-lg">{t('joinRoom')}</button>
-              </div>
-            </div>
-          ) : onlineStatus === 'connecting' ? (
-            <div className="text-center py-12 space-y-4"><div className="w-10 h-10 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" /><p className="font-bold text-slate-500">{t('connecting')}</p></div>
-          ) : (
-            <div className="grid lg:grid-cols-5 gap-6 sm:gap-8">
-              <div className="lg:col-span-3 space-y-6 sm:space-y-8 bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-6 sm:p-8 rounded-[2rem] sm:rounded-[3rem]">
-                <div className="flex flex-wrap gap-4 justify-between items-end">
-                  <div className="space-y-1"><span className="text-[10px] font-black uppercase text-slate-500">Room Code</span><div className="flex items-center gap-3"><span className="text-2xl sm:text-3xl font-mono font-black text-cyan-400">{roomId || joinId}</span><button onClick={() => { navigator.clipboard.writeText(roomId || joinId); showMessage('Copied!'); }}><Copy className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500" /></button></div></div>
-                  <div className="bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800"><span className="text-[8px] block font-black text-slate-500 uppercase tracking-widest">{t('youAre')}</span><span className="font-black text-xs sm:text-sm">{isHost ? t('host') : t('client')}</span></div>
+
+          {onlineStatus === 'idle' || onlineStatus === 'discovery' ? (
+            <div className="grid lg:grid-cols-2 gap-6 items-start">
+              {/* Host Section */}
+              <div className="bg-slate-900/80 border border-slate-800 p-6 sm:p-10 rounded-[2.5rem] space-y-8 backdrop-blur-xl shadow-2xl">
+                <div className="flex items-center gap-4 text-yellow-500">
+                  <div className="w-12 h-12 bg-yellow-500/10 rounded-2xl flex items-center justify-center"><UserPlus className="w-6 h-6"/></div>
+                  <div><h3 className="text-xl sm:text-2xl font-black">{t('createRoom')}</h3><p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Establish a new command</p></div>
                 </div>
-                <div className="space-y-4 pt-6 border-t border-slate-800/50">
-                  <div className="flex items-center gap-2 text-yellow-500"><User className="w-4 h-4 sm:w-5 sm:h-5" /><h4 className="font-black uppercase tracking-widest text-[10px] sm:text-xs">{t('lobbyEdit')}</h4></div>
-                  <input value={players[myPlayerId!]?.name || ''} onChange={e => { 
-                    const next = [...players]; 
-                    next[myPlayerId!] = { ...next[myPlayerId!], name: e.target.value }; 
-                    setPlayers(next); 
-                    if (mode === 'online') {
-                      const msg = { type: 'LOBBY_UPDATE', payload: { players: next.map(serializePlayer) } };
-                      if (isHost) connections.forEach(c => c.send(msg));
-                      else if (connections.length > 0) connections[0].send(msg);
-                    }
-                  }} placeholder={t('namePlace')} className="w-full bg-slate-950 border border-slate-800 p-3 sm:p-4 rounded-xl font-bold outline-none ring-yellow-500/30 focus:ring-2 transition-all" />
-                  <div className="flex gap-2 flex-wrap">{DEFAULT_COLORS.map(c => <button key={c} onClick={() => { 
-                    const next = [...players]; 
-                    next[myPlayerId!] = { ...next[myPlayerId!], color: c }; 
-                    setPlayers(next); 
-                    if (mode === 'online') {
-                      const msg = { type: 'LOBBY_UPDATE', payload: { players: next.map(serializePlayer) } };
-                      if (isHost) connections.forEach(c => c.send(msg));
-                      else if (connections.length > 0) connections[0].send(msg);
-                    }
-                  }} style={{ backgroundColor: c }} className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl border-2 transition-all ${players[myPlayerId!]?.color === c ? 'border-white scale-110 shadow-lg' : 'border-transparent opacity-40 hover:opacity-100'}`} />)}</div>
-                </div>
-                {isHost && (
-                  <div className="pt-6 space-y-6 border-t border-slate-800/50">
-                    <div className="flex items-center justify-center gap-3">
-                      <span className="font-bold text-slate-400 text-sm">{t('players')}</span>
-                      {[2,3,4].map(n => <button key={n} onClick={() => setPlayerCount(n)} className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl font-black transition-all ${playerCount === n ? 'bg-yellow-500 text-slate-950' : 'bg-slate-800 text-slate-500'}`}>{n}</button>)}
+
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase text-slate-500 ml-1">{t('roomName')}</label>
+                    <input value={roomName} onChange={e => setRoomName(e.target.value)} className="w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl font-bold outline-none ring-yellow-500/30 focus:ring-2 transition-all" />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black uppercase text-slate-500 ml-1">{t('players')}</label>
+                      <div className="flex gap-2">
+                        {[2,3,4].map(n => <button key={n} onClick={() => setPlayerCount(n)} className={`flex-1 py-3 rounded-xl font-black transition-all ${playerCount === n ? 'bg-yellow-500 text-slate-950' : 'bg-slate-800 text-slate-500'}`}>{n}</button>)}
+                      </div>
                     </div>
-                    <button onClick={initGameGrid} disabled={players.filter(p => p.name).length < playerCount} className="w-full py-4 sm:py-6 bg-yellow-500 text-slate-950 font-black text-xl sm:text-2xl rounded-2xl sm:rounded-3xl disabled:opacity-20 shadow-xl transition-all active:scale-[0.98]">{t('start')}</button>
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black uppercase text-slate-500 ml-1">{t('privacy')}</label>
+                      <div className="flex gap-2">
+                        <button onClick={() => setIsPublic(true)} className={`flex-1 py-3 rounded-xl font-black transition-all flex items-center justify-center gap-2 ${isPublic ? 'bg-cyan-500 text-white' : 'bg-slate-800 text-slate-500'}`}><Unlock className="w-3 h-3"/> {t('public')}</button>
+                        <button onClick={() => setIsPublic(false)} className={`flex-1 py-3 rounded-xl font-black transition-all flex items-center justify-center gap-2 ${!isPublic ? 'bg-slate-200 text-slate-950' : 'bg-slate-800 text-slate-500'}`}><Lock className="w-3 h-3"/> {t('private')}</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button onClick={handleHost} className="w-full py-5 bg-yellow-500 text-slate-950 font-black text-xl rounded-2xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all">{t('startOnlineGame')}</button>
+                </div>
+              </div>
+
+              {/* Join Section */}
+              <div className="space-y-6">
+                <div className="flex bg-slate-900/50 p-2 rounded-2xl border border-white/5">
+                  <button onClick={() => setOnlineStatus('discovery')} className={`flex-1 py-3 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-2 ${onlineStatus === 'discovery' ? 'bg-slate-800 text-white' : 'text-slate-500'}`}><Search className="w-4 h-4"/> {t('publicLobby')}</button>
+                  <button onClick={() => setOnlineStatus('idle')} className={`flex-1 py-3 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-2 ${onlineStatus === 'idle' ? 'bg-slate-800 text-white' : 'text-slate-500'}`}><Hash className="w-4 h-4"/> {t('privateRoom')}</button>
+                </div>
+
+                {onlineStatus === 'idle' ? (
+                  <div className="bg-slate-900/80 border border-slate-800 p-8 rounded-[2.5rem] space-y-6 shadow-xl animate-in zoom-in-95 duration-300">
+                    <div className="flex items-center gap-4 text-cyan-400">
+                      <Hash className="w-8 h-8"/>
+                      <h3 className="text-xl font-black">{t('privateRoom')}</h3>
+                    </div>
+                    <div className="space-y-4">
+                      <input value={joinId} onChange={e => setJoinId(e.target.value)} placeholder={t('roomID')} className="w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl font-bold outline-none ring-cyan-500/30 focus:ring-2 transition-all uppercase tracking-widest text-center" />
+                      <button onClick={() => handleJoin()} className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-black rounded-2xl transition-all shadow-lg">{t('joinRoom')}</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-slate-900/80 border border-slate-800 p-8 rounded-[2.5rem] space-y-4 shadow-xl animate-in zoom-in-95 duration-300 min-h-[300px]">
+                    <div className="flex justify-between items-center mb-2">
+                       <h3 className="text-xs font-black uppercase text-slate-500 tracking-[0.2em]">{t('publicLobby')}</h3>
+                       <button onClick={() => setPublicRooms(getMockPublicRooms())} className="text-[10px] font-black text-cyan-500 hover:text-cyan-400 transition-colors uppercase flex items-center gap-2"><RotateCcw className="w-3 h-3"/> {t('refresh')}</button>
+                    </div>
+                    <div className="space-y-3">
+                       {publicRooms.length > 0 ? (
+                         publicRooms.map(room => (
+                           <div key={room.id} className="p-4 bg-slate-950/50 rounded-2xl border border-white/5 flex items-center justify-between group hover:border-yellow-500/30 transition-all cursor-pointer" onClick={() => handleJoin(room.id)}>
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-yellow-500/10 rounded-xl flex items-center justify-center text-yellow-500"><Swords className="w-5 h-5"/></div>
+                                <div><div className="font-black text-sm">{room.name}</div><div className="text-[8px] text-slate-500 uppercase font-black">Host: {room.hostName}</div></div>
+                              </div>
+                              <div className="text-right">
+                                 <div className="text-[10px] font-black text-cyan-400">{room.currentPlayers}/{room.maxPlayers} Players</div>
+                                 <div className="text-[8px] text-slate-600 uppercase font-black">Status: Peacetime</div>
+                              </div>
+                           </div>
+                         ))
+                       ) : (
+                          <div className="p-10 border-2 border-dashed border-slate-800 rounded-3xl text-center space-y-2 opacity-50">
+                             <Globe className="w-8 h-8 mx-auto text-slate-700"/>
+                             <p className="text-xs font-black text-slate-600 uppercase tracking-widest">{t('noRooms')}</p>
+                          </div>
+                       )}
+                    </div>
                   </div>
                 )}
               </div>
-              <div className="lg:col-span-2 bg-slate-900/50 backdrop-blur-lg border border-slate-800 p-6 sm:p-8 rounded-[2rem] sm:rounded-[3rem] space-y-6">
-                <h4 className="text-[10px] sm:text-xs font-black text-slate-500 flex items-center gap-2 uppercase tracking-widest"><Users className="w-4 h-4" /> Enrolled Empires</h4>
-                <div className="space-y-3 overflow-y-auto max-h-[300px] scrollbar-hide">
+            </div>
+          ) : onlineStatus === 'connecting' ? (
+            <div className="text-center py-24 space-y-6">
+              <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto shadow-[0_0_20px_rgba(6,182,212,0.2)]" />
+              <p className="font-black text-slate-500 uppercase tracking-[0.3em] animate-pulse">{t('connecting')}</p>
+            </div>
+          ) : (
+            <div className="grid lg:grid-cols-5 gap-6 sm:gap-8">
+              <div className="lg:col-span-3 space-y-6 sm:space-y-8 bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-6 sm:p-10 rounded-[3rem] shadow-2xl">
+                <div className="flex flex-wrap gap-6 justify-between items-end">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black uppercase text-slate-500 ml-1">Secure Signal Link</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl sm:text-4xl font-mono font-black text-cyan-400 drop-shadow-glow">{roomId || joinId}</span>
+                      <button onClick={() => { navigator.clipboard.writeText(roomId || joinId); showMessage('Frequency copied to clipboard'); }} className="p-2 hover:bg-slate-800 rounded-xl transition-all"><Copy className="w-5 h-5 text-slate-500" /></button>
+                    </div>
+                  </div>
+                  <div className="bg-slate-950 px-4 py-2 rounded-2xl border border-slate-800 shadow-inner">
+                    <span className="text-[8px] block font-black text-slate-500 uppercase tracking-widest mb-1">{t('youAre')}</span>
+                    <span className="font-black text-xs sm:text-sm text-yellow-500 uppercase tracking-widest">{isHost ? t('host') : t('client')}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-6 pt-8 border-t border-slate-800/50">
+                  <div className="flex items-center gap-2 text-yellow-500"><User className="w-5 h-5" /><h4 className="font-black uppercase tracking-widest text-[10px] sm:text-xs">{t('lobbyEdit')}</h4></div>
+                  <div className="grid sm:grid-cols-2 gap-6 items-center">
+                    <input value={players[myPlayerId!]?.name || ''} onChange={e => updateProfile(e.target.value, players[myPlayerId!]?.color)} placeholder={t('namePlace')} className="w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl font-bold outline-none ring-yellow-500/30 focus:ring-2 transition-all" />
+                    <div className="flex gap-2 flex-wrap">{DEFAULT_COLORS.map(c => <button key={c} onClick={() => updateProfile(players[myPlayerId!]?.name, c)} style={{ backgroundColor: c }} className={`w-10 h-10 rounded-xl border-2 transition-all ${players[myPlayerId!]?.color === c ? 'border-white scale-110 shadow-[0_0_15px_rgba(255,255,255,0.2)]' : 'border-transparent opacity-40 hover:opacity-100'}`} />)}</div>
+                  </div>
+                </div>
+
+                {isHost && (
+                  <div className="pt-8 space-y-6 border-t border-slate-800/50">
+                    <button onClick={initGameGrid} disabled={players.filter(p => p.name).length < playerCount} className="w-full py-6 bg-yellow-500 text-slate-950 font-black text-2xl rounded-[2rem] disabled:opacity-20 shadow-2xl transition-all active:scale-[0.98] uppercase tracking-widest">{t('startOnlineGame')}</button>
+                  </div>
+                )}
+              </div>
+
+              <div className="lg:col-span-2 bg-slate-900/50 backdrop-blur-lg border border-slate-800 p-8 rounded-[3rem] space-y-6 shadow-xl">
+                <h4 className="text-[10px] sm:text-xs font-black text-slate-500 flex items-center gap-2 uppercase tracking-widest"><Users className="w-4 h-4" /> Enrolled Empires ({players.filter(p => p.name).length}/{playerCount})</h4>
+                <div className="space-y-3 overflow-y-auto max-h-[400px] pr-2 scrollbar-thin">
                   {players.map((p, i) => p.name ? (
-                    <div key={i} className="flex items-center justify-between p-3 bg-slate-950/50 rounded-2xl border border-white/5">
-                      <div className="flex items-center gap-3"><div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} /><span className="font-black text-xs sm:text-sm truncate">{p.name} {i === 0 && <span className="text-[8px] text-yellow-500 opacity-50 ml-1 uppercase">(HOST)</span>}</span></div>
-                      {myPlayerId === i && <Monitor className="w-4 h-4 text-cyan-500" />}
+                    <div key={i} className={`flex items-center justify-between p-4 bg-slate-950/50 rounded-2xl border transition-all ${myPlayerId === i ? 'border-cyan-500/50 bg-cyan-500/5' : 'border-white/5'}`}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-4 h-4 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.1)]" style={{ backgroundColor: p.color }} />
+                        <span className="font-black text-sm sm:text-base truncate max-w-[120px]">{p.name} {i === 0 && <span className="text-[8px] text-yellow-500 opacity-50 ml-1 uppercase">(HOST)</span>}</span>
+                      </div>
+                      {myPlayerId === i && <div className="flex items-center gap-2 text-cyan-400 font-black text-[10px] uppercase"><Monitor className="w-4 h-4"/> You</div>}
                     </div>
                   ) : null)}
+                  {Array.from({ length: Math.max(0, playerCount - players.filter(p => p.name).length) }).map((_, i) => (
+                    <div key={`empty-${i}`} className="p-4 border border-dashed border-slate-800 rounded-2xl flex items-center gap-3 opacity-30">
+                       <div className="w-4 h-4 rounded-full bg-slate-800" />
+                       <span className="text-[10px] font-black uppercase tracking-widest">Waiting for Signal...</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
           )}
-          <button onClick={resetToLanding} className="w-full text-slate-600 font-bold hover:text-white transition-all text-sm uppercase tracking-widest">{t('reset')}</button>
+          <button onClick={resetToLanding} className="w-full text-slate-600 font-bold hover:text-white transition-all text-sm uppercase tracking-widest py-4">{t('reset')}</button>
         </div>
       </div>
     );
@@ -1214,17 +1230,18 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 sm:p-8 text-white">
         <div className="max-w-4xl w-full space-y-8 sm:space-y-12">
-          <div className="text-center space-y-2"><h2 className="text-3xl sm:text-5xl font-black tracking-tight">{uiState === 'config' ? t('customize') : t('playNow')}</h2><p className="text-slate-500 font-black uppercase tracking-widest text-[10px] sm:text-xs">{uiState === 'config' ? 'Configure match' : 'Trial Identity Setup'}</p></div>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="text-center space-y-2"><h2 className="text-3xl sm:text-5xl font-black tracking-tight">{uiState === 'config' ? t('customize') : t('playNow')}</h2><p className="text-slate-500 font-black uppercase tracking-widest text-[10px] sm:text-xs">{uiState === 'config' ? 'Configure local match' : 'Trial Identity Setup'}</p></div>
+          <div className="grid sm:grid-cols-2 gap-6">
             {players.map((p, idx) => (
-              <div key={idx} className="bg-slate-900/50 border border-slate-800 p-5 rounded-[2rem] space-y-4">
-                <div className="flex justify-between items-center"><span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Empire {idx+1}</span><div className="w-4 h-4 rounded-full" style={{ backgroundColor: p.color }} /></div>
-                <input value={p.name} onChange={e => { const n = [...players]; n[idx].name = e.target.value; setPlayers(n); }} placeholder={t('namePlace')} className="w-full bg-slate-950 border border-slate-800 p-3 sm:p-4 rounded-xl font-bold outline-none ring-yellow-500/30 focus:ring-2" />
-                <div className="flex gap-2 flex-wrap">{DEFAULT_COLORS.map(c => <button key={c} onClick={() => { const n = [...players]; n[idx].color = c; setPlayers(n); }} style={{ backgroundColor: c }} className={`w-8 h-8 rounded-lg border-2 transition-all ${p.color === c ? 'border-white scale-110' : 'border-transparent opacity-40 hover:opacity-100'}`} />)}</div>
+              <div key={idx} className="bg-slate-900/50 border border-slate-800 p-6 rounded-[2.5rem] space-y-5 backdrop-blur-xl">
+                <div className="flex justify-between items-center"><span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Empire #{idx+1}</span><div className="w-4 h-4 rounded-full shadow-lg" style={{ backgroundColor: p.color }} /></div>
+                <input value={p.name} onChange={e => { const n = [...players]; n[idx].name = e.target.value; setPlayers(n); }} placeholder={t('namePlace')} className="w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl font-bold outline-none ring-yellow-500/30 focus:ring-2 transition-all" />
+                <div className="flex gap-2 flex-wrap">{DEFAULT_COLORS.map(c => <button key={c} onClick={() => { const n = [...players]; n[idx].color = c; setPlayers(n); }} style={{ backgroundColor: c }} className={`w-8 h-8 rounded-xl border-2 transition-all ${p.color === c ? 'border-white scale-110 shadow-lg' : 'border-transparent opacity-40 hover:opacity-100'}`} />)}</div>
               </div>
             ))}
           </div>
-          <button onClick={initGameGrid} className="w-full py-5 bg-yellow-500 text-slate-950 font-black text-2xl sm:text-3xl rounded-3xl shadow-2xl hover:bg-yellow-400 active:scale-95 transition-all">{t('start')}</button>
+          <button onClick={initGameGrid} className="w-full py-6 bg-yellow-500 text-slate-950 font-black text-2xl sm:text-3xl rounded-[2rem] shadow-2xl hover:scale-[1.01] active:scale-95 transition-all">{t('start')}</button>
+          <button onClick={resetToLanding} className="w-full text-slate-600 font-bold hover:text-white transition-all text-sm uppercase tracking-widest">{t('reset')}</button>
         </div>
       </div>
     );
