@@ -23,7 +23,7 @@ const DEFAULT_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '
 
 const ALL_DIRECTIONS = [
     [0, 1], [0, -1], [1, 0], [-1, 0],
-    [1, 1], [1, -1], [-1, 1], [-1, -1]
+    [1, 1], [1, -1], [1, 1], [-1, -1]
 ];
 
 type Lang = 'en' | 'ko';
@@ -412,6 +412,12 @@ const App: React.FC = () => {
   const connectionsRef = useRef<any[]>([]);
   const isHostRef = useRef<boolean>(false);
   const playersRef = useRef<Player[]>([]); // Using ref to avoid stale closures in some callbacks
+  const roomIdRef = useRef<string>(''); // Ref for roomId
+  const isPublicRef = useRef<boolean>(true); // Ref for isPublic
+  const playerCountRef = useRef<number>(2); // Ref for playerCount
+  const myPlayerIdRef = useRef<number | null>(null); // Ref for myPlayerId
+  const roomNameRef = useRef<string>('New World Era'); // Ref for roomName
+
   const gridRef = useRef<Cell[][]>([]);
   const currentIdxRef = useRef<number>(0);
   const turnRef = useRef<number>(1);
@@ -426,6 +432,13 @@ const App: React.FC = () => {
   useEffect(() => { turnRef.current = gameTurn; }, [gameTurn]);
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { logsRef.current = logs; }, [logs]);
+  // Update refs for online multiplayer states
+  useEffect(() => { roomIdRef.current = roomId; }, [roomId]);
+  useEffect(() => { isPublicRef.current = isPublic; }, [isPublic]);
+  useEffect(() => { playerCountRef.current = playerCount; }, [playerCount]);
+  useEffect(() => { myPlayerIdRef.current = myPlayerId; }, [myPlayerId]);
+  useEffect(() => { roomNameRef.current = roomName; }, [roomName]);
+
 
   const currentPlayer = players[currentIdx];
   const isMyTurn = mode === 'local' || (myPlayerId !== null && currentIdx === myPlayerId);
@@ -611,7 +624,7 @@ const App: React.FC = () => {
 
   const nextTurn = (updatedGrid?: Cell[][], updatedPlayers?: Player[], updatedLogs?: GameLogEntry[]) => {
     if (phaseRef.current === 'end') return;
-    if (!isMyTurn && mode === 'online') return;
+    if (!isMyTurn) return; // Use isMyTurn for player actions
     const finalGrid = updatedGrid || gridRef.current;
     let finalLogs = updatedLogs || logsRef.current;
     const workingPlayers = [...(updatedPlayers || playersRef.current)];
@@ -927,23 +940,37 @@ const App: React.FC = () => {
   }, []);
 
   const handleRefreshPublicRooms = useCallback(() => {
-    // Get host player from the `players` state if available and current user is host
-    // `players` is in this useCallback's dependency array, so it will be the latest state.
-    const hostPlayer = (isHost && myPlayerId === 0) ? players[0] : null;
-    const currentHostName = hostPlayer?.name || (lang === 'ko' ? '방장' : 'Host');
+    // Access state via refs to ensure the most current values are read,
+    // especially after asynchronous operations or state updates.
+    const currentIsHost = isHostRef.current;
+    const currentRoomId = roomIdRef.current;
+    const currentIsPublic = isPublicRef.current;
+    const currentMyPlayerId = myPlayerIdRef.current;
+    const currentPlayers = playersRef.current; // Get the latest players array from ref
+    const currentConnections = connectionsRef.current; // Get the latest connections array from ref
+    const currentRoomName = roomNameRef.current; // Get the latest roomName from ref
+    const currentPlayerCount = playerCountRef.current; // Get the latest playerCount from ref
 
-    if (isHost && roomId && isPublic && hostPlayer) { // Added hostPlayer check for safety
+    const isCurrentUserHostAndHasRoom = currentIsHost && currentRoomId && currentIsPublic && currentMyPlayerId === 0;
+
+    if (isCurrentUserHostAndHasRoom) {
+        // Host player should always be at index 0 in the players array for the host.
+        const hostPlayer = currentPlayers[0];
+        const currentHostName = hostPlayer?.name || (lang === 'ko' ? '방장' : 'Host');
+
         setPublicRooms([{
-            id: roomId,
-            name: roomName,
-            currentPlayers: connections.length + 1,
-            maxPlayers: playerCount,
+            id: currentRoomId,
+            name: currentRoomName,
+            currentPlayers: currentConnections.length + 1, // Host + all connected clients
+            maxPlayers: currentPlayerCount,
             hostName: currentHostName
         }]);
     } else {
-        setPublicRooms([]); // Directly clear, equivalent to clearPublicRooms()
+        // For clients, or if no public room is actively hosted by this user (or it's private), clear the list.
+        setPublicRooms([]);
     }
-  }, [isHost, roomId, roomName, isPublic, connections.length, playerCount, players, myPlayerId, lang]);
+  }, [lang]); // Dependencies simplified as most values are read from refs
+
 
   useEffect(() => {
     // When entering discovery mode, trigger a refresh to show any relevant rooms (currently only self-hosted public ones).
@@ -959,30 +986,29 @@ const App: React.FC = () => {
       setRoomId(id);
       setIsHost(true);
       setMyPlayerId(0);
-      setOnlineStatus('lobby');
       setPeer(p);
 
-      // Determine the initial host player name and color.
-      // Use the name from the `players` state (which reflects previous config or default)
-      // or a fallback default if `players[0]` is not yet meaningful.
-      const initialHostName = players[0]?.name || (lang === 'ko' ? '방장' : 'Host');
-      const initialHostColor = players[0]?.color || DEFAULT_COLORS[0];
-
+      // Create a temporary host player object using the latest configured name/color
       const hostInitialPlayer: Player = {
         id: 0,
-        name: initialHostName, // Use this consistent initial name
-        color: initialHostColor,
+        name: playersRef.current[0]?.name || (lang === 'ko' ? '방장' : 'Host'), // Get initial configured name
+        color: playersRef.current[0]?.color || DEFAULT_COLORS[0],
         capital: null, capitalLevel: 1, capitalUpgrade: null, cities: [], territory: new Set<string>(), originalTerritories: new Set<string>(), warWith: new Set<PlayerID>(), truceWith: new Set<PlayerID>(), truceTurns: {}, truceProposals: new Set<PlayerID>(), eliminated: false,
       };
+
+      // IMMEDIATELY update the players state for the host
       setPlayers([hostInitialPlayer]);
 
-      if (isPublic) {
+      // Now, set onlineStatus to 'lobby' AFTER players is updated.
+      setOnlineStatus('lobby'); 
+
+      if (isPublic) { // Use isPublic from state, as this is the value chosen by the user
           setPublicRooms(prev => [...prev, {
               id: id,
               name: roomName, // Room name from input field
               currentPlayers: 1,
               maxPlayers: playerCount,
-              hostName: hostInitialPlayer.name // Use the determined host's name
+              hostName: hostInitialPlayer.name // Use the name derived for this specific player object
           }]);
       }
     });
@@ -998,9 +1024,12 @@ const App: React.FC = () => {
           connectionsRef.current.forEach(c => c.send({ type: 'LOBBY_UPDATE', payload: { players: nextPlayers.map(serializePlayer) } }));
 
           // If the room is public and current user is host, update publicRooms to reflect new player count.
-          if (isHostRef.current && isPublic) { 
+          if (isHostRef.current && isPublicRef.current) { // Use refs for `isPublic`
+            const currentHostPlayer = nextPlayers[0]; // Host is always player 0
+            const updatedHostName = currentHostPlayer?.name || (lang === 'ko' ? '방장' : 'Host');
+
             setPublicRooms(currentPublicRooms => currentPublicRooms.map(room =>
-              room.id === roomId ? { ...room, currentPlayers: nextPlayers.length } : room
+              room.id === roomIdRef.current ? { ...room, currentPlayers: nextPlayers.length, hostName: updatedHostName } : room
             ));
           }
           return nextPlayers;
@@ -1008,7 +1037,7 @@ const App: React.FC = () => {
       });
       conn.on('data', handlePeerData);
     });
-  }, [lang, isPublic, roomName, playerCount, players, handlePeerData, roomId]);
+  }, [lang, roomName, playerCount, isPublic, playersRef]); // Added isPublic to deps, removed roomId as it's set in this callback
 
   const handleJoin = useCallback((targetId?: string) => {
     const id = targetId || joinId;
