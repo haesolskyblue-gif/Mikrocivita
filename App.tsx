@@ -6,7 +6,7 @@ import {
   Bird, Globe, RotateCcw, SquareArrowUp, Star, Landmark, ChevronRight, Play, Sparkles,
   Link as LinkIcon, Copy, UserPlus, Zap, LayoutGrid, List, Github, Twitter, MessageSquare, ChevronDown, Monitor, Cpu, Handshake, XCircle, Palette, User, Settings, BookOpen, Info, Lock, Unlock, Hash, Search
 } from 'lucide-react';
-import { Player, Cell, GamePhase, GameLogEntry, PlayerID, GameMode } from './types.ts';
+import { Player, Cell, GamePhase, GameLogEntry, PlayerID, GameMode, CellType } from './types.ts';
 // @ts-ignore
 import { Peer } from 'https://esm.sh/peerjs@1.5.4';
 
@@ -208,7 +208,7 @@ const TRANSLATIONS = {
     capital: "수도",
     city: "도시",
     noEnemyInvade: "사거리 내에 적대적인 영토가 없습니다!",
-    multiplayer: "온라인 서버",
+    multiplayer: "Online Servers",
     createRoom: "방 만들기",
     joinRoom: "참가하기",
     roomID: "방 코드 입력",
@@ -220,7 +220,7 @@ const TRANSLATIONS = {
     client: "참가자",
     notYourTurn: "다른 문명의 턴입니다",
     activePlayer: "{name}의 차례",
-    map: "전략 지도",
+    map: "Strategic Map",
     status: "문명 정보",
     pickTruceEnemy: "🕊️ 휴전을 제안할 적을 선택하십시오.",
     forceTruceTitle: "권력 공고화",
@@ -424,6 +424,23 @@ const App: React.FC = () => {
   const turnRef = useRef<number>(1);
   const phaseRef = useRef<GamePhase>('setup');
   const logsRef = useRef<GameLogEntry[]>([]);
+
+  // Zoom & Pan states
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [isZoomingOrPanning, setIsZoomingOrPanning] = useState(false); // New state for active gesture
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const zoomableElementRef = useRef<HTMLDivElement>(null);
+  const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const initialPinchDistance = useRef<number | null>(null);
+  const lastPan = useRef<{ x: number; y: number } | null>(null);
+  const animationFrameId = useRef<number | null>(null);
+
+  const MIN_ZOOM = 0.5;
+  const MAX_ZOOM = 3;
+  const ZOOM_SENSITIVITY = 0.001; // For mouse wheel
+  const CELL_SIZE = 44; // Corresponds to sm:w-11 sm:h-11
 
   useEffect(() => { connectionsRef.current = connections; }, [connections]);
   useEffect(() => { isHostRef.current = isHost; }, [isHost]);
@@ -998,7 +1015,7 @@ const App: React.FC = () => {
     if (mode === 'online' && isHostRef.current) {
       broadcastGameState(nextP, nextGrid, currentIdxRef.current, turnRef.current, phaseRef.current, nextLogs);
     }
-  }, [mode, isHostRef, currentIdxRef, myPlayerIdRef, connectionsRef, showMessage, t, addLog, currentPlayer, players, grid, broadcastGameState, isMyTurn]); // Dependencies updated
+  }, [mode, isHostRef, currentIdxRef, myPlayerIdRef, connectionsRef, showMessage, t, addLog, currentPlayer, players, grid, broadcastGameState, isMyTurn]);
 
 
   const updateProfile = (name: string, color: string) => {
@@ -1137,7 +1154,7 @@ const App: React.FC = () => {
       default:
         console.warn('Received unknown peer data type:', data.type, data);
     }
-  }, [addLog, broadcastGameState, checkWinCondition, currentIdxRef, isHostRef, connectionsRef, nextTurn, respondToTruce, playersRef, phaseRef, t, turnRef, myPlayerIdRef]); // Dependencies updated
+  }, [addLog, broadcastGameState, checkWinCondition, currentIdxRef, isHostRef, connectionsRef, nextTurn, respondToTruce, playersRef, phaseRef, t, turnRef, myPlayerIdRef]);
 
   const handleRefreshPublicRooms = useCallback(() => {
     // Access state via refs to ensure the most current values are read,
@@ -1256,6 +1273,154 @@ const App: React.FC = () => {
     });
   }, [joinId, handlePeerData]);
 
+  // --- Zoom & Pan Logic ---
+  const getMidpoint = (pointers: Map<number, { x: number; y: number }>) => {
+      let x = 0;
+      let y = 0;
+      pointers.forEach(p => {
+          x += p.x;
+          y += p.y;
+      });
+      return { x: x / pointers.size, y: y / pointers.size };
+  };
+
+  const getDistance = (p1: { x: number; y: number }, p2: { x: number; y: number }) => {
+      return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+  };
+
+  const applyTransform = useCallback((newZoom: number, newPanX: number, newPanY: number) => {
+      if (zoomableElementRef.current) {
+          zoomableElementRef.current.style.transform = `translate(${newPanX}px, ${newPanY}px) scale(${newZoom})`;
+      }
+  }, []);
+
+  const updateTransformState = useCallback((newZoom: number, newPanX: number, newPanY: number) => {
+      setZoomLevel(newZoom);
+      setPanX(newPanX);
+      setPanY(newPanY);
+      // Request animation frame for visual update, debouncing if needed
+      if (animationFrameId.current) {
+          cancelAnimationFrame(animationFrameId.current);
+      }
+      animationFrameId.current = requestAnimationFrame(() => {
+          applyTransform(newZoom, newPanX, newPanY);
+      });
+  }, [applyTransform]);
+
+  const handlePointerDown = useCallback((e: PointerEvent) => {
+      e.preventDefault();
+      setIsZoomingOrPanning(true); // Start interaction
+      activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (activePointers.current.size === 1) {
+          lastPan.current = { x: e.clientX, y: e.clientY };
+      } else if (activePointers.current.size === 2) {
+          const [p1, p2] = Array.from(activePointers.current.values());
+          initialPinchDistance.current = getDistance(p1, p2);
+          lastPan.current = getMidpoint(activePointers.current);
+      }
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
+
+  const handlePointerMove = useCallback((e: PointerEvent) => {
+      if (!activePointers.current.has(e.pointerId)) return;
+      e.preventDefault(); // Crucial for preventing default browser pinch-zoom/scroll
+
+      activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (activePointers.current.size === 1 && lastPan.current) {
+          const dx = e.clientX - lastPan.current.x;
+          const dy = e.clientY - lastPan.current.y;
+          lastPan.current = { x: e.clientX, y: e.clientY };
+
+          updateTransformState(zoomLevel, panX + dx, panY + dy);
+
+      } else if (activePointers.current.size === 2 && initialPinchDistance.current !== null && lastPan.current) {
+          const [p1, p2] = Array.from(activePointers.current.values());
+          const currentDistance = getDistance(p1, p2);
+          const scaleFactor = currentDistance / initialPinchDistance.current;
+
+          const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomLevel * scaleFactor));
+
+          const rect = scrollContainerRef.current?.getBoundingClientRect();
+          const pinchCenter = getMidpoint(activePointers.current);
+          const clientX = pinchCenter.x - (rect?.left || 0);
+          const clientY = pinchCenter.y - (rect?.top || 0);
+
+          const oldPanX = panX;
+          const oldPanY = panY;
+
+          const newPanX = clientX - (clientX - oldPanX) * (newZoom / zoomLevel);
+          const newPanY = clientY - (clientY - oldPanY) * (newZoom / zoomLevel);
+          
+          updateTransformState(newZoom, newPanX, newPanY);
+
+          initialPinchDistance.current = currentDistance;
+          lastPan.current = pinchCenter;
+      }
+  }, [zoomLevel, panX, panY, updateTransformState]);
+
+  const handlePointerUp = useCallback((e: PointerEvent) => {
+      activePointers.current.delete(e.pointerId);
+      if (activePointers.current.size < 2) {
+          initialPinchDistance.current = null;
+      }
+      if (activePointers.current.size === 0) {
+          lastPan.current = null;
+          setIsZoomingOrPanning(false); // End interaction
+      }
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+  }, []);
+
+  const handleWheel = useCallback((e: WheelEvent) => {
+      e.preventDefault();
+
+      if (!scrollContainerRef.current || !zoomableElementRef.current) return;
+
+      const scaleAmount = e.deltaY * -ZOOM_SENSITIVITY;
+      const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomLevel * (1 + scaleAmount)));
+
+      const rect = scrollContainerRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const oldPanX = panX;
+      const oldPanY = panY;
+
+      const newPanX = mouseX - (mouseX - oldPanX) * (newZoom / zoomLevel);
+      const newPanY = mouseY - (mouseY - oldPanY) * (newZoom / zoomLevel);
+      
+      updateTransformState(newZoom, newPanX, newPanY);
+
+  }, [zoomLevel, panX, panY, updateTransformState]);
+
+
+  // Attach/detach event listeners for zoom/pan
+  useEffect(() => {
+      const scrollContainer = scrollContainerRef.current;
+      if (scrollContainer) {
+          scrollContainer.addEventListener('pointerdown', handlePointerDown as EventListener, { passive: false });
+          scrollContainer.addEventListener('pointermove', handlePointerMove as EventListener, { passive: false });
+          scrollContainer.addEventListener('pointerup', handlePointerUp as EventListener, { passive: false });
+          scrollContainer.addEventListener('pointercancel', handlePointerUp as EventListener, { passive: false });
+          scrollContainer.addEventListener('pointerleave', handlePointerUp as EventListener, { passive: false });
+          scrollContainer.addEventListener('wheel', handleWheel as EventListener, { passive: false });
+
+          return () => {
+              scrollContainer.removeEventListener('pointerdown', handlePointerDown as EventListener);
+              scrollContainer.removeEventListener('pointermove', handlePointerMove as EventListener);
+              scrollContainer.removeEventListener('pointerup', handlePointerUp as EventListener);
+              scrollContainer.removeEventListener('pointercancel', handlePointerUp as EventListener);
+              scrollContainer.removeEventListener('pointerleave', handlePointerUp as EventListener);
+              scrollContainer.removeEventListener('wheel', handleWheel as EventListener);
+              if (animationFrameId.current) {
+                  cancelAnimationFrame(animationFrameId.current);
+              }
+          };
+      }
+  }, [handlePointerDown, handlePointerMove, handlePointerUp, handleWheel]);
+  // --- End Zoom & Pan Logic ---
+
   const Hero = () => (
     <section className="relative min-h-[90vh] flex flex-col items-center justify-center p-6 sm:p-12 overflow-hidden text-center">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(59,130,246,0.05),transparent)]" />
@@ -1295,7 +1460,7 @@ const App: React.FC = () => {
         const ownerBorders = { top: !checkOwnerNeighbor(y - 1, x), right: !checkOwnerNeighbor(y, x + 1), bottom: !checkOwnerNeighbor(y + 1, x), left: !checkOwnerNeighbor(y, x - 1) };
         const getBorderStyle = (type: string) => {
             if (type === 'international') return '1.5px solid rgba(0,0,0,0.75)';
-            if (type === 'jurisdiction') return '0.5px solid rgba(0,0,0,0.1)';
+            if (type === 'jurisdiction') return '1px dashed rgba(255,255,255,0.2)'; // Enhanced style for domestic borders
             return undefined;
         };
         const isEdge = ownerBorders.top || ownerBorders.right || ownerBorders.bottom || ownerBorders.left;
@@ -1306,15 +1471,28 @@ const App: React.FC = () => {
             borderBottomLeftRadius: (ownerBorders.bottom && ownerBorders.left) ? cornerRadius : 0,
             borderBottomRightRadius: (ownerBorders.bottom && ownerBorders.right) ? cornerRadius : 0,
         } : {};
+
+        let cellBackgroundColor = undefined;
+        if (cell.owner !== null && players[cell.owner]) {
+          if (cell.type === 'capital') {
+            cellBackgroundColor = '#f59e0b'; // Fixed yellow for capital
+          } else if (cell.type === 'city') {
+            cellBackgroundColor = shadeColor(ownerColor, -80);
+          } else if (cell.type === 'land') {
+            if (cell.control?.includes('captured')) {
+              cellBackgroundColor = shadeColor(ownerColor, 130);
+            } else if (cell.control === 'capital') {
+              cellBackgroundColor = shadeColor(ownerColor, 40);
+            } else {
+              cellBackgroundColor = shadeColor(ownerColor, 75);
+            }
+          }
+        }
+
         return (
           <div key={`${x}-${y}`} onClick={() => cellClick(x, y)}
             style={{ 
-              backgroundColor: cell.owner !== null && players[cell.owner] ? (
-                cell.type === 'capital' ? '#f59e0b' : 
-                cell.type === 'city' ? shadeColor(ownerColor, -80) : 
-                (cell.control?.includes('captured') ? shadeColor(ownerColor, 130) : 
-                (cell.control === 'capital' ? shadeColor(ownerColor, 40) : shadeColor(ownerColor, 75)))
-              ) : undefined,
+              backgroundColor: cellBackgroundColor, // Reverted to backgroundColor
               borderTop: getBorderStyle(borders.top), borderRight: getBorderStyle(borders.right), borderBottom: getBorderStyle(borders.bottom), borderLeft: getBorderStyle(borders.left),
               ...borderRadiusStyle,
               boxShadow: (isEdge && cell.owner !== null) ? `inset 0 0 5px rgba(255,255,255,0.05), 0 0 10px ${players[cell.owner]?.color}22` : undefined,
@@ -1340,7 +1518,6 @@ const App: React.FC = () => {
           <div className="flex items-center gap-2"><Landmark className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-500" /><span className="text-lg sm:text-2xl font-black tracking-tighter uppercase">{t('title')}</span></div>
           <div className="flex gap-4">
              <button onClick={() => setLang('en')} className={`text-xs sm:text-sm font-black transition-all ${lang === 'en' ? 'text-yellow-500' : 'text-slate-500'}`}>EN</button>
-             {/* Fix: Removed duplicate 'className' attribute */}
              <button onClick={() => setLang('ko')} className={`text-xs sm:text-sm font-black transition-all ${lang === 'ko' ? 'text-yellow-500' : 'text-slate-500'}`}>KO</button>
           </div>
         </nav>
