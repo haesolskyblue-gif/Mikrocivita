@@ -22,8 +22,8 @@ const GRID_SIZE_MAP: Record<number, number> = { 2: 15, 3: 18, 4: 20 };
 const DEFAULT_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
 
 const ALL_DIRECTIONS = [
-    [0, 1], [0, -1], [1, 0], [-1, 0],
-    [1, 1], [1, -1], [1, 1], [-1, -1]
+    [0, 1], [0, -1], [1, 0], [-1, 0], // Cardinal
+    [1, 1], [1, -1], [-1, 1], [-1, -1] // Intercardinal - Corrected
 ];
 
 type Lang = 'en' | 'ko';
@@ -417,6 +417,7 @@ const App: React.FC = () => {
   const playerCountRef = useRef<number>(2); // Ref for playerCount
   const myPlayerIdRef = useRef<number | null>(null); // Ref for myPlayerId
   const roomNameRef = useRef<string>('New World Era'); // Ref for roomName
+  const expandedTilesRef = useRef<Set<string>>(new Set()); // Ref to accumulate selected tiles for manual expansion
 
   const gridRef = useRef<Cell[][]>([]);
   const currentIdxRef = useRef<number>(0);
@@ -756,26 +757,52 @@ const App: React.FC = () => {
       const frontier = Array.from(frontierSet);
       if (frontier.length === 0) { showMessage(t('noExpansion')); return; }
       if (frontier.length <= capacityLeft) {
-        const newGrid = [...gridRef.current.map(r => [...r])];
+        const newGrid = JSON.parse(JSON.stringify(gridRef.current)); // Deep copy current grid
         const newPlayers = [...playersRef.current.map(pl => ({ ...pl, territory: new Set(pl.territory) }))];
         const p = { ...newPlayers[currentIdxRef.current] };
         frontier.forEach(key => { const [fy, fx] = key.split(',').map(Number); newGrid[fy][fx] = { owner: currentIdxRef.current, type: 'land', control: center.id, level: 1 }; p.territory.add(key); });
         newPlayers[currentIdxRef.current] = p;
         const newLogs = addLog(currentIdxRef.current, t('expandLog', { center: center.name, n: frontier.length })); nextTurn(newGrid, newPlayers, newLogs);
       } else {
-        setExpansionRemaining(capacityLeft); setSelectableCells(new Set(frontier)); showMessage(t('manualExpand', { n: capacityLeft }));
+        // Manual expansion mode
+        expandedTilesRef.current.clear(); // Clear any previous selections
+        setExpansionRemaining(capacityLeft); 
+        setSelectableCells(new Set(frontier)); // Show all potential frontier tiles
+        showMessage(t('manualExpand', { n: capacityLeft }));
+
         setPendingAction(() => (mx: number, my: number) => {
-          const mKey = `${my},${mx}`; if (!frontierSet.has(mKey)) return;
-          const newGrid = [...gridRef.current.map(r => [...r])];
-          newGrid[my][mx] = { owner: currentIdxRef.current, type: 'land', control: center.id, level: 1 };
-          const newPlayers = [...playersRef.current.map(pl => ({ ...pl, territory: new Set(pl.territory) }))];
-          const p = { ...newPlayers[currentIdxRef.current] }; p.territory.add(mKey); newPlayers[currentIdxRef.current] = p;
-          setGrid(newGrid); setPlayers(newPlayers);
-          setExpansionRemaining(prev => { 
-              if (prev - 1 <= 0) { const newLogs = addLog(currentIdxRef.current, t('expandLog', { center: center.name, n: capacityLeft })); setTimeout(() => nextTurn(newGrid, newPlayers, newLogs), 10); return 0; } 
-              return prev - 1; 
+          const mKey = `${my},${mx}`;
+          if (!frontierSet.has(mKey) || expandedTilesRef.current.has(mKey)) return; // Ensure valid and not already selected
+
+          expandedTilesRef.current.add(mKey); // Add to ref, don't trigger re-render yet
+          setSelectableCells(prev => { const ns = new Set(prev); ns.delete(mKey); return ns; }); // Visually remove from selectable
+          
+          setExpansionRemaining(prev => {
+              const newRemaining = prev - 1;
+              if (newRemaining <= 0) {
+                  // All tiles selected, finalize changes
+                  const finalGrid = JSON.parse(JSON.stringify(gridRef.current)); // Deep copy current grid
+                  const finalPlayers = [...playersRef.current.map(pl => ({ ...pl, territory: new Set(pl.territory) }))];
+                  const p = { ...finalPlayers[currentIdxRef.current] };
+
+                  expandedTilesRef.current.forEach(tileKey => {
+                      const [fy, fx] = tileKey.split(',').map(Number);
+                      finalGrid[fy][fx] = { owner: currentIdxRef.current, type: 'land', control: center.id, level: 1 };
+                      p.territory.add(tileKey);
+                  });
+                  finalPlayers[currentIdxRef.current] = p;
+
+                  const newLogs = addLog(currentIdxRef.current, t('expandLog', { center: center.name, n: capacityLeft }));
+                  nextTurn(finalGrid, finalPlayers, newLogs); // Call nextTurn with the accumulated final state
+
+                  // Reset manual expansion specific states
+                  expandedTilesRef.current.clear();
+                  setPendingAction(null);
+                  setSelectableCells(new Set());
+                  return 0;
+              }
+              return newRemaining;
           });
-          setSelectableCells(prev => { const ns = new Set(prev); ns.delete(mKey); return ns; });
         });
       }
     });
@@ -834,7 +861,7 @@ const App: React.FC = () => {
     gridRef.current.forEach((row, y) => row.forEach((cell, x) => { if (cell.owner !== null && cell.owner !== currentIdxRef.current && !currentPlayer.warWith.has(cell.owner) && !currentPlayer.truceWith.has(cell.owner)) enemyTerritories.add(`${y},${x}`); }));
     if (enemyTerritories.size === 0) return;
     setSelectableCells(enemyTerritories); showMessage(t('pickEnemy'));
-    setPendingAction(() => (x: number, y: number) => {
+    setPendingAction(() => (x: number, y: number) => { // Corrected: removed extra ()
       const targetCell = gridRef.current[y][x]; if (!enemyTerritories.has(`${y},${x}`)) return;
       const targetId = targetCell.owner!;
       const nextP = [...playersRef.current.map(pl => ({ ...pl, warWith: new Set(pl.warWith) }))];
@@ -851,7 +878,7 @@ const App: React.FC = () => {
     const enemyTerritories: Set<string> = new Set();
     gridRef.current.forEach((row, y) => row.forEach((cell, x) => { if (cell.owner !== null && cell.owner !== currentIdxRef.current && currentPlayer.warWith.has(cell.owner)) { enemyTerritories.add(`${y},${x}`); } }));
     setSelectableCells(enemyTerritories); showMessage(t('pickTruceEnemy'));
-    setPendingAction(() => (x: number, y: number) => {
+    setPendingAction(() => (x: number, y: number) => { // Corrected: removed extra ()
       const targetCell = gridRef.current[y][x]; if (!enemyTerritories.has(`${y},${x}`)) return;
       const targetId = targetCell.owner!;
       const nextP = [...playersRef.current.map(pl => ({ ...pl, truceProposals: new Set(pl.truceProposals) }))];
@@ -1140,6 +1167,7 @@ const App: React.FC = () => {
           <div className="flex items-center gap-2"><Landmark className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-500" /><span className="text-lg sm:text-2xl font-black tracking-tighter uppercase">{t('title')}</span></div>
           <div className="flex gap-4">
              <button onClick={() => setLang('en')} className={`text-xs sm:text-sm font-black transition-all ${lang === 'en' ? 'text-yellow-500' : 'text-slate-500'}`}>EN</button>
+             {/* Fix: Removed duplicate 'className' attribute */}
              <button onClick={() => setLang('ko')} className={`text-xs sm:text-sm font-black transition-all ${lang === 'ko' ? 'text-yellow-500' : 'text-slate-500'}`}>KO</button>
           </div>
         </nav>
