@@ -6,7 +6,7 @@ import {
   Bird, Globe, RotateCcw, SquareArrowUp, Star, Landmark, ChevronRight, Play, Sparkles,
   Link as LinkIcon, Copy, UserPlus, Zap, LayoutGrid, List, Github, Twitter, MessageSquare, ChevronDown, Monitor, Cpu, Handshake, XCircle, Palette, User, Settings, BookOpen, Info, Lock, Unlock, Hash, Search
 } from 'lucide-react';
-import { Player, Cell, GamePhase, GameLogEntry, PlayerID, GameMode, CellType } from './types.ts';
+import { Player, Cell, GamePhase, GameLogEntry, PlayerID, GameMode } from './types.ts';
 // @ts-ignore
 import { Peer } from 'https://esm.sh/peerjs@1.5.4';
 
@@ -208,7 +208,7 @@ const TRANSLATIONS = {
     capital: "수도",
     city: "도시",
     noEnemyInvade: "사거리 내에 적대적인 영토가 없습니다!",
-    multiplayer: "Online Servers",
+    multiplayer: "온라인 서버",
     createRoom: "방 만들기",
     joinRoom: "참가하기",
     roomID: "방 코드 입력",
@@ -220,7 +220,7 @@ const TRANSLATIONS = {
     client: "참가자",
     notYourTurn: "다른 문명의 턴입니다",
     activePlayer: "{name}의 차례",
-    map: "Strategic Map",
+    map: "전략 지도",
     status: "문명 정보",
     pickTruceEnemy: "🕊️ 휴전을 제안할 적을 선택하십시오.",
     forceTruceTitle: "권력 공고화",
@@ -425,23 +425,6 @@ const App: React.FC = () => {
   const phaseRef = useRef<GamePhase>('setup');
   const logsRef = useRef<GameLogEntry[]>([]);
 
-  // Zoom & Pan states
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [panX, setPanX] = useState(0);
-  const [panY, setPanY] = useState(0);
-  const [isZoomingOrPanning, setIsZoomingOrPanning] = useState(false); // New state for active gesture
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const zoomableElementRef = useRef<HTMLDivElement>(null);
-  const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map());
-  const initialPinchDistance = useRef<number | null>(null);
-  const lastPan = useRef<{ x: number; y: number } | null>(null);
-  const animationFrameId = useRef<number | null>(null);
-
-  const MIN_ZOOM = 0.5;
-  const MAX_ZOOM = 3;
-  const ZOOM_SENSITIVITY = 0.001; // For mouse wheel
-  const CELL_SIZE = 44; // Corresponds to sm:w-11 sm:h-11
-
   useEffect(() => { connectionsRef.current = connections; }, [connections]);
   useEffect(() => { isHostRef.current = isHost; }, [isHost]);
   useEffect(() => { playersRef.current = players; }, [players]);
@@ -508,11 +491,13 @@ const App: React.FC = () => {
   }, []);
 
   /**
-   * Broadcasts the current game state to all connected clients.
-   * This function is exclusively called by the host to ensure authoritative state synchronization.
+   * Synchronizes the game state across connected peers.
+   * This function is called by the host to broadcast state to clients,
+   * or by clients (e.g., for lobby updates or tool responses) to send state to the host.
+   * A full state synchronization approach is used to ensure consistency.
    */
-  const broadcastGameState = useCallback((updatedPlayers: Player[], updatedGrid: Cell[][], updatedCurrentIdx: number, updatedTurn: number, updatedPhase: GamePhase, updatedLogs: GameLogEntry[]) => {
-    if (mode === 'online' && isHostRef.current) {
+  const syncGameState = (updatedPlayers: Player[], updatedGrid: Cell[][], updatedCurrentIdx: number, updatedTurn: number, updatedPhase: GamePhase, updatedLogs: GameLogEntry[]) => {
+    if (mode === 'online') {
       const payload = {
         players: updatedPlayers.map(serializePlayer),
         grid: updatedGrid,
@@ -522,10 +507,14 @@ const App: React.FC = () => {
         logs: updatedLogs,
       };
       const msg = { type: 'SYNC_STATE', payload };
-      connectionsRef.current.forEach(conn => conn.send(msg));
+      if (isHostRef.current) {
+        connectionsRef.current.forEach(conn => conn.send(msg));
+      } else if (connectionsRef.current.length > 0) {
+        // In client role, send to the host (first connection)
+        connectionsRef.current[0].send(msg);
+      }
     }
-  }, [mode]); // Dependencies: mode, isHostRef.current, connectionsRef.current (implicitly via connectionsRef.current)
-
+  };
 
   const checkWinCondition = (updatedPlayers: Player[], currentLogs: GameLogEntry[]) => {
     const techWinner = updatedPlayers.find(p => p.capitalLevel >= 10);
@@ -597,7 +586,7 @@ const App: React.FC = () => {
     if (isTutorial) setTutStep(1);
     if (mode === 'online' && isHost) {
         connections.forEach((conn, i) => conn.send({ type: 'START_GAME', myId: i + 1 }));
-        broadcastGameState(finalPlayers, initialGrid, 0, 1, 'setup', initLogs);
+        syncGameState(finalPlayers, initialGrid, 0, 1, 'setup', initLogs);
     }
   };
 
@@ -634,46 +623,13 @@ const App: React.FC = () => {
     return { players: nextP, grid: nextGrid };
   };
 
-  const nextTurn = useCallback((updatedGrid?: Cell[][], updatedPlayers?: Player[], updatedLogs?: GameLogEntry[], playerRequestingTurnEndId: number | null = null) => {
-    // If online mode and this is a client, send a request to the host.
-    if (mode === 'online' && !isHostRef.current) {
-        if (currentIdxRef.current !== myPlayerIdRef.current) {
-            showMessage(t('notYourTurn')); // Prevent current client from acting if it's not their turn
-            return;
-        }
-        if (connectionsRef.current.length > 0) {
-            // Client is requesting to end their turn.
-            connectionsRef.current[0].send({ type: 'END_TURN_REQUEST', payload: { playerId: myPlayerIdRef.current } });
-            // Clear client's local pending states and show waiting message
-            setPendingAction(null);
-            setSelectableCells(new Set());
-            setExpansionRemaining(0);
-            setPendingTruceTarget(null);
-            showMessage(t('notYourTurn')); 
-        } else {
-            console.warn('Client tried to end turn but no host connection found.');
-        }
-        return; // Client does not execute local game logic
-    }
-
-    // If we are here, it's either local mode, or we are the host in online mode.
-    // Proceed with game logic.
+  const nextTurn = (updatedGrid?: Cell[][], updatedPlayers?: Player[], updatedLogs?: GameLogEntry[]) => {
     if (phaseRef.current === 'end') return;
-    
-    // If it's a host processing a client's request, ensure it's that player's turn.
-    if (mode === 'online' && isHostRef.current && playerRequestingTurnEndId !== null && currentIdxRef.current !== playerRequestingTurnEndId) {
-        console.warn(`Host: Received END_TURN_REQUEST from player ${playerRequestingTurnEndId} but it's not their turn.`);
-        return;
-    }
-
-    setPendingAction(null); setSelectableCells(new Set()); setExpansionRemaining(0); setPendingTruceTarget(null);
-
+    if (!isMyTurn) return; // Use isMyTurn for player actions
     const finalGrid = updatedGrid || gridRef.current;
     let finalLogs = updatedLogs || logsRef.current;
     const workingPlayers = [...(updatedPlayers || playersRef.current)];
     const p = { ...workingPlayers[currentIdxRef.current] };
-
-    // --- Core game logic for turn advancement ---
     if (p.capitalUpgrade) {
       const up = { ...p.capitalUpgrade, remaining: p.capitalUpgrade.remaining - 1 };
       if (up.remaining <= 0) {
@@ -700,82 +656,44 @@ const App: React.FC = () => {
     });
     p.truceTurns = newTruceTurns; p.truceWith = newTruceWith;
     workingPlayers[currentIdxRef.current] = p;
-
     const winResult = checkWinCondition(workingPlayers, finalLogs);
     const finalPhase = winResult.phase;
     finalLogs = winResult.logs;
-
-    let nextIdx = (currentIdxRef.current + 1) % playerCountRef.current;
+    setPendingAction(null); setSelectableCells(new Set()); setExpansionRemaining(0); setPendingTruceTarget(null);
+    let nextIdx = (currentIdxRef.current + 1) % playerCount;
     const areThereSurvivors = workingPlayers.some((pl, idx) => !pl.eliminated && pl.name && idx !== currentIdxRef.current);
-    if (areThereSurvivors) { while (workingPlayers[nextIdx] && (workingPlayers[nextIdx].eliminated || !workingPlayers[nextIdx].name)) { nextIdx = (nextIdx + 1) % playerCountRef.current; } }
+    if (areThereSurvivors) { while (workingPlayers[nextIdx] && (workingPlayers[nextIdx].eliminated || !workingPlayers[nextIdx].name)) { nextIdx = (nextIdx + 1) % playerCount; } }
     let nextTurnNum = turnRef.current;
     if (nextIdx === 0) { nextTurnNum = turnRef.current + 1; setGameTurn(nextTurnNum); }
-    // --- End core game logic ---
-
     setPlayers(workingPlayers); setGrid(finalGrid); setLogs(finalLogs); setCurrentIdx(nextIdx); setPhase(finalPhase);
     if (isTutorial && nextTurnNum === 2 && tutStep === 1) setTutStep(2);
     if (isTutorial && nextTurnNum === 4 && tutStep === 2) setTutStep(3);
-
-    // Only host broadcasts the new authoritative state
-    if (mode === 'online' && isHostRef.current) { 
-      broadcastGameState(workingPlayers, finalGrid, nextIdx, nextTurnNum, finalPhase, finalLogs);
-    }
-  }, [mode, playerCountRef, isTutorial, tutStep, t, addLog, checkWinCondition, showMessage]); // Dependencies updated
+    if (mode === 'online') { syncGameState(workingPlayers, finalGrid, nextIdx, nextTurnNum, finalPhase, finalLogs); }
+  };
 
   const cellClick = (x: number, y: number) => {
-    if (!isMyTurn) return; // Prevent client interaction if not their turn in online mode
-
-    // Host or local mode: direct execution
-    if (mode === 'local' || isHostRef.current) {
-      if (phaseRef.current === 'setup') {
-        if (gridRef.current[y][x].owner !== null) return;
-        let tooClose = false;
-        playersRef.current.forEach(p => { if (p.capital) { const dist = Math.max(Math.abs(p.capital.x - x), Math.abs(p.capital.y - y)); if (dist < 5) tooClose = true; } });
-        if (tooClose) { showMessage(t('tooCloseCap')); return; }
-        const newGrid = [...gridRef.current.map(row => [...row])];
-        const newPlayers = [...playersRef.current.map(p => ({ ...p, territory: new Set(p.territory), originalTerritories: new Set(p.territory) }))];
-        const p = { ...newPlayers[currentIdxRef.current] };
-        p.capital = { x, y }; p.territory.add(`${y},${x}`); p.originalTerritories.add(`${y},${x}`);
-        newGrid[y][x] = { owner: currentIdxRef.current, type: 'capital', control: 'capital', level: 1 };
-        claimAround(currentIdxRef.current, x, y, 1, newPlayers, newGrid);
-        newPlayers[currentIdxRef.current] = p;
-        const survivorsCount = newPlayers.filter(pl => pl.name).length;
-        const isLastPlayer = currentIdxRef.current === survivorsCount - 1;
-        const nextPhase = isLastPlayer ? 'play' : 'setup';
-        const nextIdx = isLastPlayer ? 0 : currentIdxRef.current + 1;
-        let finalLogs = logsRef.current;
-        if (isLastPlayer) { finalLogs = addLog(-1, t('struggleStart'), 'info'); setPhase('play'); }
-        setGrid(newGrid); setPlayers(newPlayers); setCurrentIdx(nextIdx);
-        // Only host broadcasts setup changes
-        if (mode === 'online' && isHostRef.current) {
-          broadcastGameState(newPlayers, newGrid, nextIdx, turnRef.current, nextPhase, finalLogs);
-        }
-      } else if (phaseRef.current === 'play' && pendingAction) { 
-        pendingAction(x, y); 
-      }
-    } else { // Online mode and not host (client)
-      if (phaseRef.current === 'setup') {
-        // Client sends a request to the host to place capital
-        if (gridRef.current[y][x].owner !== null) return;
-        let tooClose = false;
-        playersRef.current.forEach(p => { if (p.capital) { const dist = Math.max(Math.abs(p.capital.x - x), Math.abs(p.capital.y - y)); if (dist < 5) tooClose = true; } });
-        if (tooClose) { showMessage(t('tooCloseCap')); return; }
-
-        if (connectionsRef.current.length > 0) {
-          connectionsRef.current[0].send({ 
-            type: 'SETUP_CAPITAL_REQUEST', 
-            payload: { playerId: myPlayerIdRef.current, x, y } 
-          });
-          showMessage(t('notYourTurn')); // Show waiting message
-        }
-        return;
-      } else if (phaseRef.current === 'play' && pendingAction) {
-        // For clients, pendingAction will directly or indirectly trigger nextTurn,
-        // which will then send END_TURN_REQUEST to the host.
-        // Local visual feedback might happen before official state update.
-        pendingAction(x, y);
-      }
-    }
+    if (!isMyTurn) return;
+    if (phaseRef.current === 'setup') {
+      if (gridRef.current[y][x].owner !== null) return;
+      let tooClose = false;
+      playersRef.current.forEach(p => { if (p.capital) { const dist = Math.max(Math.abs(p.capital.x - x), Math.abs(p.capital.y - y)); if (dist < 5) tooClose = true; } });
+      if (tooClose) { showMessage(t('tooCloseCap')); return; }
+      const newGrid = [...gridRef.current.map(row => [...row])];
+      const newPlayers = [...playersRef.current.map(p => ({ ...p, territory: new Set(p.territory), originalTerritories: new Set(p.originalTerritories) }))];
+      const p = { ...newPlayers[currentIdxRef.current] };
+      p.capital = { x, y }; p.territory.add(`${y},${x}`); p.originalTerritories.add(`${y},${x}`);
+      newGrid[y][x] = { owner: currentIdxRef.current, type: 'capital', control: 'capital', level: 1 };
+      claimAround(currentIdxRef.current, x, y, 1, newPlayers, newGrid);
+      newPlayers[currentIdxRef.current] = p;
+      const survivorsCount = newPlayers.filter(pl => pl.name).length;
+      const isLastPlayer = currentIdxRef.current === survivorsCount - 1;
+      const nextPhase = isLastPlayer ? 'play' : 'setup';
+      const nextIdx = isLastPlayer ? 0 : currentIdxRef.current + 1;
+      let finalLogs = logsRef.current;
+      if (isLastPlayer) { finalLogs = addLog(-1, t('struggleStart'), 'info'); setPhase('play'); }
+      setGrid(newGrid); setPlayers(newPlayers); setCurrentIdx(nextIdx);
+      syncGameState(newPlayers, newGrid, nextIdx, turnRef.current, nextPhase, finalLogs);
+    } else if (phaseRef.current === 'play' && pendingAction) { pendingAction(x, y); }
   };
 
   const handleCityGrow = () => {
@@ -943,7 +861,7 @@ const App: React.FC = () => {
     gridRef.current.forEach((row, y) => row.forEach((cell, x) => { if (cell.owner !== null && cell.owner !== currentIdxRef.current && !currentPlayer.warWith.has(cell.owner) && !currentPlayer.truceWith.has(cell.owner)) enemyTerritories.add(`${y},${x}`); }));
     if (enemyTerritories.size === 0) return;
     setSelectableCells(enemyTerritories); showMessage(t('pickEnemy'));
-    setPendingAction(() => (x: number, y: number) => { 
+    setPendingAction(() => (x: number, y: number) => { // Corrected: removed extra ()
       const targetCell = gridRef.current[y][x]; if (!enemyTerritories.has(`${y},${x}`)) return;
       const targetId = targetCell.owner!;
       const nextP = [...playersRef.current.map(pl => ({ ...pl, warWith: new Set(pl.warWith) }))];
@@ -960,7 +878,7 @@ const App: React.FC = () => {
     const enemyTerritories: Set<string> = new Set();
     gridRef.current.forEach((row, y) => row.forEach((cell, x) => { if (cell.owner !== null && cell.owner !== currentIdxRef.current && currentPlayer.warWith.has(cell.owner)) { enemyTerritories.add(`${y},${x}`); } }));
     setSelectableCells(enemyTerritories); showMessage(t('pickTruceEnemy'));
-    setPendingAction(() => (x: number, y: number) => { 
+    setPendingAction(() => (x: number, y: number) => { // Corrected: removed extra ()
       const targetCell = gridRef.current[y][x]; if (!enemyTerritories.has(`${y},${x}`)) return;
       const targetId = targetCell.owner!;
       const nextP = [...playersRef.current.map(pl => ({ ...pl, truceProposals: new Set(pl.truceProposals) }))];
@@ -970,37 +888,9 @@ const App: React.FC = () => {
     });
   };
 
-  const respondToTruce = useCallback((proposingPlayerId: number, accept: boolean) => {
-    // If online mode and this is a client, send a request to the host.
-    if (mode === 'online' && !isHostRef.current) {
-      if (currentIdxRef.current !== myPlayerIdRef.current) {
-        showMessage(t('notYourTurn')); // Prevent current client from acting if it's not their turn
-        return;
-      }
-      if (connectionsRef.current.length > 0) {
-        connectionsRef.current[0].send({ 
-          type: 'TRUCE_RESPONSE_REQUEST', 
-          payload: { 
-            playerId: myPlayerIdRef.current, 
-            proposingPlayerId, 
-            accept 
-          } 
-        });
-        showMessage(t('notYourTurn')); // Show waiting message
-      } else {
-        console.warn('Client tried to respond to truce but no host connection found.');
-      }
-      return; // Client does not execute local game logic
-    }
-
-    // If we are here, it's either local mode or we are the host in online mode.
-    // Proceed with truce logic.
-    if (!isMyTurn) return; // Should always be my turn if I'm host and processing locally
-
-    let nextP = playersRef.current; 
-    let nextGrid = gridRef.current; 
-    let nextLogs = logsRef.current;
-
+  const respondToTruce = (proposingPlayerId: number, accept: boolean) => {
+    if (!isMyTurn) return;
+    let nextP = playersRef.current; let nextGrid = gridRef.current; let nextLogs = logsRef.current;
     if (accept) {
       const truceRes = establishTruce(currentIdx, proposingPlayerId, playersRef.current, gridRef.current);
       nextP = truceRes.players; nextGrid = truceRes.grid;
@@ -1011,12 +901,8 @@ const App: React.FC = () => {
       nextLogs = addLog(currentIdxRef.current, t('truceDeclineLog', { name: currentPlayer.name }), 'info');
     }
     setPlayers(nextP); setGrid(nextGrid); setLogs(nextLogs);
-    // Only host broadcasts the new authoritative state
-    if (mode === 'online' && isHostRef.current) {
-      broadcastGameState(nextP, nextGrid, currentIdxRef.current, turnRef.current, phaseRef.current, nextLogs);
-    }
-  }, [mode, isHostRef, currentIdxRef, myPlayerIdRef, connectionsRef, showMessage, t, addLog, currentPlayer, players, grid, broadcastGameState, isMyTurn]);
-
+    syncGameState(nextP, nextGrid, currentIdxRef.current, turnRef.current, phaseRef.current, nextLogs);
+  };
 
   const updateProfile = (name: string, color: string) => {
     if (myPlayerId === null) return;
@@ -1034,7 +920,6 @@ const App: React.FC = () => {
             ));
           }
         } else if (connections.length > 0) {
-          // Client sends lobby update to host
           connections[0].send(msg);
         }
       }
@@ -1058,7 +943,6 @@ const App: React.FC = () => {
       case 'LOBBY_UPDATE':
         // Updates lobby specific information, like player list and their details.
         // If host, re-broadcasts the updated lobby state to all connected clients.
-        // If client, applies the host's lobby update.
         if (data.payload.myId !== undefined) setMyPlayerId(data.payload.myId);
         if (data.payload.players) {
           setPlayers(data.payload.players.map(deserializePlayer));
@@ -1071,90 +955,16 @@ const App: React.FC = () => {
         setUiState('game'); setPhase('setup');
         break;
       case 'SYNC_STATE':
-        // Receives a full snapshot of the game state from the host and updates all relevant state variables.
-        // This is the authoritative state for clients.
+        // Receives a full snapshot of the game state and updates all relevant state variables.
+        // This is a robust way to ensure clients are always in sync with the host's game state.
         const { players: p, grid: g, currentIdx: ci, turn: t, phase: ph, logs: l } = data.payload;
         setPlayers(p.map(deserializePlayer)); setGrid(g); setCurrentIdx(ci); setGameTurn(t); setPhase(ph); setLogs(l);
-        // Clear client's local pending states after receiving new state from host
-        setPendingAction(null);
-        setSelectableCells(new Set());
-        setExpansionRemaining(0);
-        setPendingTruceTarget(null);
-        setMessage(null); // Clear any 'waiting' messages
         break;
-      case 'END_TURN_REQUEST':
-        if (isHostRef.current) {
-          // Host receives a request to end turn from a client.
-          const requestedPlayerId = data.payload.playerId;
-          if (currentIdxRef.current === requestedPlayerId) {
-            nextTurn(undefined, undefined, undefined, requestedPlayerId); // Host processes its next turn
-          } else {
-            console.warn(`Host received END_TURN_REQUEST from player ${requestedPlayerId} but it's not their turn.`);
-          }
-        }
-        break;
-      case 'TRUCE_RESPONSE_REQUEST':
-        if (isHostRef.current) {
-          // Host receives a truce response from a client.
-          const { playerId, proposingPlayerId, accept } = data.payload;
-          if (currentIdxRef.current === playerId) {
-            respondToTruce(proposingPlayerId, accept); // Host processes the truce response
-          } else {
-            console.warn(`Host received TRUCE_RESPONSE_REQUEST from player ${playerId} but it's not their turn.`);
-          }
-        }
-        break;
-      case 'SETUP_CAPITAL_REQUEST':
-        if (isHostRef.current) {
-          // Host receives a request to place capital during setup phase
-          const { playerId, x, y } = data.payload;
-          if (phaseRef.current === 'setup' && currentIdxRef.current === playerId) {
-            // Re-use existing cellClick logic for capital placement directly
-            // Need to ensure the logic in cellClick doesn't directly call syncGameState if it's not the host's action.
-            // For now, call the core logic directly (or modify cellClick to take an 'isHost' flag)
-            // Or simpler: have client-specific cellClick for setup send request.
-            
-            // Re-run the setup part of cellClick directly for the host.
-            // This re-evaluates the conditions (tooClose) before applying.
-            let tooClose = false;
-            playersRef.current.forEach(p => { if (p.capital) { const dist = Math.max(Math.abs(p.capital.x - x), Math.abs(p.capital.y - y)); if (dist < 5) tooClose = true; } });
-            if (gridRef.current[y][x].owner !== null || tooClose) {
-                console.warn(`Host: Client ${playerId} attempted invalid capital placement at (${x}, ${y}).`);
-                return;
-            }
-
-            const newGrid = [...gridRef.current.map(row => [...row])];
-            const newPlayers = [...playersRef.current.map(p_ => ({ ...p_, territory: new Set(p_.territory), originalTerritories: new Set(p_.originalTerritories) }))];
-            const p_ = { ...newPlayers[playerId] };
-            p_.capital = { x, y }; p_.territory.add(`${y},${x}`); p_.originalTerritories.add(`${y},${x}`);
-            newGrid[y][x] = { owner: playerId, type: 'capital', control: 'capital', level: 1 };
-            claimAround(playerId, x, y, 1, newPlayers, newGrid);
-            newPlayers[playerId] = p_;
-            
-            setGrid(newGrid); setPlayers(newPlayers);
-            // After placing, determine next turn, etc.
-            // This is effectively part of the turn transition in setup phase.
-            // Host then advances the turn (to next player's setup or to play phase)
-            // and broadcasts.
-            const survivorsCount = newPlayers.filter(pl => pl.name).length;
-            const isLastPlayer = playerId === survivorsCount - 1; // Assuming players are added sequentially by ID
-            const nextPhase = isLastPlayer ? 'play' : 'setup';
-            const nextIdx = isLastPlayer ? 0 : playerId + 1; // Advance to next player ID
-            let finalLogs = logsRef.current;
-            if (isLastPlayer) { finalLogs = addLog(-1, t('struggleStart'), 'info'); }
-
-            setLogs(finalLogs); setCurrentIdx(nextIdx); setPhase(nextPhase);
-            broadcastGameState(newPlayers, newGrid, nextIdx, turnRef.current, nextPhase, finalLogs);
-
-          } else {
-            console.warn(`Host received SETUP_CAPITAL_REQUEST from player ${playerId} during wrong phase or not their turn.`);
-          }
-        }
-        break;
+      // Add more cases here for other network messages (e.g., chat, specific actions if not using full state sync)
       default:
         console.warn('Received unknown peer data type:', data.type, data);
     }
-  }, [addLog, broadcastGameState, checkWinCondition, currentIdxRef, isHostRef, connectionsRef, nextTurn, respondToTruce, playersRef, phaseRef, t, turnRef, myPlayerIdRef]);
+  }, []);
 
   const handleRefreshPublicRooms = useCallback(() => {
     // Access state via refs to ensure the most current values are read,
@@ -1254,7 +1064,7 @@ const App: React.FC = () => {
       });
       conn.on('data', handlePeerData);
     });
-  }, [lang, roomName, playerCount, isPublic, playersRef, handlePeerData]); // Added handlePeerData to deps
+  }, [lang, roomName, playerCount, isPublic, playersRef]); // Added isPublic to deps, removed roomId as it's set in this callback
 
   const handleJoin = useCallback((targetId?: string) => {
     const id = targetId || joinId;
@@ -1272,154 +1082,6 @@ const App: React.FC = () => {
       conn.on('data', handlePeerData);
     });
   }, [joinId, handlePeerData]);
-
-  // --- Zoom & Pan Logic ---
-  const getMidpoint = (pointers: Map<number, { x: number; y: number }>) => {
-      let x = 0;
-      let y = 0;
-      pointers.forEach(p => {
-          x += p.x;
-          y += p.y;
-      });
-      return { x: x / pointers.size, y: y / pointers.size };
-  };
-
-  const getDistance = (p1: { x: number; y: number }, p2: { x: number; y: number }) => {
-      return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
-  };
-
-  const applyTransform = useCallback((newZoom: number, newPanX: number, newPanY: number) => {
-      if (zoomableElementRef.current) {
-          zoomableElementRef.current.style.transform = `translate(${newPanX}px, ${newPanY}px) scale(${newZoom})`;
-      }
-  }, []);
-
-  const updateTransformState = useCallback((newZoom: number, newPanX: number, newPanY: number) => {
-      setZoomLevel(newZoom);
-      setPanX(newPanX);
-      setPanY(newPanY);
-      // Request animation frame for visual update, debouncing if needed
-      if (animationFrameId.current) {
-          cancelAnimationFrame(animationFrameId.current);
-      }
-      animationFrameId.current = requestAnimationFrame(() => {
-          applyTransform(newZoom, newPanX, newPanY);
-      });
-  }, [applyTransform]);
-
-  const handlePointerDown = useCallback((e: PointerEvent) => {
-      e.preventDefault();
-      setIsZoomingOrPanning(true); // Start interaction
-      activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-      if (activePointers.current.size === 1) {
-          lastPan.current = { x: e.clientX, y: e.clientY };
-      } else if (activePointers.current.size === 2) {
-          const [p1, p2] = Array.from(activePointers.current.values());
-          initialPinchDistance.current = getDistance(p1, p2);
-          lastPan.current = getMidpoint(activePointers.current);
-      }
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }, []);
-
-  const handlePointerMove = useCallback((e: PointerEvent) => {
-      if (!activePointers.current.has(e.pointerId)) return;
-      e.preventDefault(); // Crucial for preventing default browser pinch-zoom/scroll
-
-      activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-      if (activePointers.current.size === 1 && lastPan.current) {
-          const dx = e.clientX - lastPan.current.x;
-          const dy = e.clientY - lastPan.current.y;
-          lastPan.current = { x: e.clientX, y: e.clientY };
-
-          updateTransformState(zoomLevel, panX + dx, panY + dy);
-
-      } else if (activePointers.current.size === 2 && initialPinchDistance.current !== null && lastPan.current) {
-          const [p1, p2] = Array.from(activePointers.current.values());
-          const currentDistance = getDistance(p1, p2);
-          const scaleFactor = currentDistance / initialPinchDistance.current;
-
-          const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomLevel * scaleFactor));
-
-          const rect = scrollContainerRef.current?.getBoundingClientRect();
-          const pinchCenter = getMidpoint(activePointers.current);
-          const clientX = pinchCenter.x - (rect?.left || 0);
-          const clientY = pinchCenter.y - (rect?.top || 0);
-
-          const oldPanX = panX;
-          const oldPanY = panY;
-
-          const newPanX = clientX - (clientX - oldPanX) * (newZoom / zoomLevel);
-          const newPanY = clientY - (clientY - oldPanY) * (newZoom / zoomLevel);
-          
-          updateTransformState(newZoom, newPanX, newPanY);
-
-          initialPinchDistance.current = currentDistance;
-          lastPan.current = pinchCenter;
-      }
-  }, [zoomLevel, panX, panY, updateTransformState]);
-
-  const handlePointerUp = useCallback((e: PointerEvent) => {
-      activePointers.current.delete(e.pointerId);
-      if (activePointers.current.size < 2) {
-          initialPinchDistance.current = null;
-      }
-      if (activePointers.current.size === 0) {
-          lastPan.current = null;
-          setIsZoomingOrPanning(false); // End interaction
-      }
-      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-  }, []);
-
-  const handleWheel = useCallback((e: WheelEvent) => {
-      e.preventDefault();
-
-      if (!scrollContainerRef.current || !zoomableElementRef.current) return;
-
-      const scaleAmount = e.deltaY * -ZOOM_SENSITIVITY;
-      const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomLevel * (1 + scaleAmount)));
-
-      const rect = scrollContainerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
-      const oldPanX = panX;
-      const oldPanY = panY;
-
-      const newPanX = mouseX - (mouseX - oldPanX) * (newZoom / zoomLevel);
-      const newPanY = mouseY - (mouseY - oldPanY) * (newZoom / zoomLevel);
-      
-      updateTransformState(newZoom, newPanX, newPanY);
-
-  }, [zoomLevel, panX, panY, updateTransformState]);
-
-
-  // Attach/detach event listeners for zoom/pan
-  useEffect(() => {
-      const scrollContainer = scrollContainerRef.current;
-      if (scrollContainer) {
-          scrollContainer.addEventListener('pointerdown', handlePointerDown as EventListener, { passive: false });
-          scrollContainer.addEventListener('pointermove', handlePointerMove as EventListener, { passive: false });
-          scrollContainer.addEventListener('pointerup', handlePointerUp as EventListener, { passive: false });
-          scrollContainer.addEventListener('pointercancel', handlePointerUp as EventListener, { passive: false });
-          scrollContainer.addEventListener('pointerleave', handlePointerUp as EventListener, { passive: false });
-          scrollContainer.addEventListener('wheel', handleWheel as EventListener, { passive: false });
-
-          return () => {
-              scrollContainer.removeEventListener('pointerdown', handlePointerDown as EventListener);
-              scrollContainer.removeEventListener('pointermove', handlePointerMove as EventListener);
-              scrollContainer.removeEventListener('pointerup', handlePointerUp as EventListener);
-              scrollContainer.removeEventListener('pointercancel', handlePointerUp as EventListener);
-              scrollContainer.removeEventListener('pointerleave', handlePointerUp as EventListener);
-              scrollContainer.removeEventListener('wheel', handleWheel as EventListener);
-              if (animationFrameId.current) {
-                  cancelAnimationFrame(animationFrameId.current);
-              }
-          };
-      }
-  }, [handlePointerDown, handlePointerMove, handlePointerUp, handleWheel]);
-  // --- End Zoom & Pan Logic ---
 
   const Hero = () => (
     <section className="relative min-h-[90vh] flex flex-col items-center justify-center p-6 sm:p-12 overflow-hidden text-center">
@@ -1460,7 +1122,7 @@ const App: React.FC = () => {
         const ownerBorders = { top: !checkOwnerNeighbor(y - 1, x), right: !checkOwnerNeighbor(y, x + 1), bottom: !checkOwnerNeighbor(y + 1, x), left: !checkOwnerNeighbor(y, x - 1) };
         const getBorderStyle = (type: string) => {
             if (type === 'international') return '1.5px solid rgba(0,0,0,0.75)';
-            if (type === 'jurisdiction') return '1px dashed rgba(255,255,255,0.2)'; // Enhanced style for domestic borders
+            if (type === 'jurisdiction') return '0.5px solid rgba(0,0,0,0.1)';
             return undefined;
         };
         const isEdge = ownerBorders.top || ownerBorders.right || ownerBorders.bottom || ownerBorders.left;
@@ -1471,28 +1133,15 @@ const App: React.FC = () => {
             borderBottomLeftRadius: (ownerBorders.bottom && ownerBorders.left) ? cornerRadius : 0,
             borderBottomRightRadius: (ownerBorders.bottom && ownerBorders.right) ? cornerRadius : 0,
         } : {};
-
-        let cellBackgroundColor = undefined;
-        if (cell.owner !== null && players[cell.owner]) {
-          if (cell.type === 'capital') {
-            cellBackgroundColor = '#f59e0b'; // Fixed yellow for capital
-          } else if (cell.type === 'city') {
-            cellBackgroundColor = shadeColor(ownerColor, -80);
-          } else if (cell.type === 'land') {
-            if (cell.control?.includes('captured')) {
-              cellBackgroundColor = shadeColor(ownerColor, 130);
-            } else if (cell.control === 'capital') {
-              cellBackgroundColor = shadeColor(ownerColor, 40);
-            } else {
-              cellBackgroundColor = shadeColor(ownerColor, 75);
-            }
-          }
-        }
-
         return (
           <div key={`${x}-${y}`} onClick={() => cellClick(x, y)}
             style={{ 
-              backgroundColor: cellBackgroundColor, // Reverted to backgroundColor
+              backgroundColor: cell.owner !== null && players[cell.owner] ? (
+                cell.type === 'capital' ? '#f59e0b' : 
+                cell.type === 'city' ? shadeColor(ownerColor, -80) : 
+                (cell.control?.includes('captured') ? shadeColor(ownerColor, 130) : 
+                (cell.control === 'capital' ? shadeColor(ownerColor, 40) : shadeColor(ownerColor, 75)))
+              ) : undefined,
               borderTop: getBorderStyle(borders.top), borderRight: getBorderStyle(borders.right), borderBottom: getBorderStyle(borders.bottom), borderLeft: getBorderStyle(borders.left),
               ...borderRadiusStyle,
               boxShadow: (isEdge && cell.owner !== null) ? `inset 0 0 5px rgba(255,255,255,0.05), 0 0 10px ${players[cell.owner]?.color}22` : undefined,
@@ -1518,6 +1167,7 @@ const App: React.FC = () => {
           <div className="flex items-center gap-2"><Landmark className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-500" /><span className="text-lg sm:text-2xl font-black tracking-tighter uppercase">{t('title')}</span></div>
           <div className="flex gap-4">
              <button onClick={() => setLang('en')} className={`text-xs sm:text-sm font-black transition-all ${lang === 'en' ? 'text-yellow-500' : 'text-slate-500'}`}>EN</button>
+             {/* Fix: Removed duplicate 'className' attribute */}
              <button onClick={() => setLang('ko')} className={`text-xs sm:text-sm font-black transition-all ${lang === 'ko' ? 'text-yellow-500' : 'text-slate-500'}`}>KO</button>
           </div>
         </nav>
