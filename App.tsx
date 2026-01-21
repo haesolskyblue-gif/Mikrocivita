@@ -239,14 +239,14 @@ const TRANSLATIONS = {
     tut2: "확장: '영토 확장'을 통해 땅을 개척하세요. 수도는 25타일, 도시는 10타일까지 가능하며 편입된 땅은 타일당 3점입니다.",
     tut3: "침공과 외지: 적을 공격해 땅을 뺏으세요. 하지만 '점령지(외지)'는 불안정합니다: 방어력이 50% 낮고 점수는 타일당 1점뿐입니다.",
     tut4: "공고화: 휴전 협정을 통해 점령지를 완전한 영토로 편입하세요. 수도 10레벨 달성 시 기술 승리를 거둡니다!",
-    publicLobby: "Public Lobby",
-    privateRoom: "Private Session",
-    roomName: "Room Name",
-    privacy: "Visibility",
-    public: "Public",
-    private: "Private",
-    noRooms: "No public warzones found.",
-    refresh: "Refresh Intel",
+    publicLobby: "공개 로비",
+    privateRoom: "비공개 세션",
+    roomName: "방 이름",
+    privacy: "공개 여부",
+    public: "전체 공개",
+    private: "암호화(비공개)",
+    noRooms: "참여 가능한 공개 작전이 없습니다.",
+    refresh: "정보 갱신",
     roomNamePrefix: "작전 구역"
   }
 };
@@ -919,20 +919,22 @@ const App: React.FC = () => {
   }, []);
 
   const handleRefreshPublicRooms = useCallback(() => {
-    if (isHost && roomId) {
-        // If the current user is the host and has an active public room, show it.
+    // Ensure playersRef.current is up-to-date for hostName
+    const currentHostName = playersRef.current[0]?.name || (lang === 'ko' ? '방장' : 'Host');
+
+    if (isHost && roomId && isPublic) { // Also check isPublic
         setPublicRooms([{
             id: roomId,
             name: roomName,
             currentPlayers: connections.length + 1, // Host + all connected clients
             maxPlayers: playerCount,
-            hostName: playersRef.current[0]?.name || (lang === 'ko' ? '방장' : 'Host')
+            hostName: currentHostName
         }]);
     } else {
-        // For clients or if no public room is actively hosted by this user, clear the list.
+        // For clients or if no public room is actively hosted by this user (or it's private), clear the list.
         setPublicRooms(clearPublicRooms());
     }
-  }, [isHost, roomId, roomName, connections.length, playerCount, playersRef, lang, clearPublicRooms]);
+  }, [isHost, roomId, roomName, isPublic, connections.length, playerCount, playersRef, lang, clearPublicRooms]);
 
   useEffect(() => {
     // When entering discovery mode, trigger a refresh to show any relevant rooms (currently only self-hosted public ones).
