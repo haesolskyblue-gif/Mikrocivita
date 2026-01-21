@@ -4,7 +4,7 @@ import {
   Trophy, Shield, Sword, Swords, Map as MapIcon, 
   Building2, FastForward, Users, 
   Bird, Globe, RotateCcw, SquareArrowUp, Star, Landmark, ChevronRight, Play, Sparkles,
-  Link as LinkIcon, Copy, UserPlus, Zap, LayoutGrid, List, Github, Twitter, MessageSquare, ChevronDown, Monitor, Cpu
+  Link as LinkIcon, Copy, UserPlus, Zap, LayoutGrid, List, Github, Twitter, MessageSquare, ChevronDown, Monitor, Cpu, Handshake, XCircle, Palette, User
 } from 'lucide-react';
 import { Player, Cell, GamePhase, GameLogEntry, PlayerID, GameMode } from './types.ts';
 // @ts-ignore
@@ -126,7 +126,17 @@ const TRANSLATIONS = {
     notYourTurn: "Waiting for other turns...",
     activePlayer: "{name}'s Turn",
     map: "Strategic Map",
-    status: "Intel"
+    status: "Intel",
+    pickTruceEnemy: "🕊️ Select an enemy to propose peace treaty.",
+    forceTruceTitle: "Consolidate Power",
+    forceTruceDesc: "You captured a colony! Force {name} into a 4-year peace treaty?",
+    forceTruceAction: "Force Treaty",
+    continueWar: "Continue War",
+    offerReceived: "Diplomatic Envoy",
+    offerDesc: "{name} is pleading for a 4-year peace treaty.",
+    tooCloseCap: "❌ Capitals must be at least 5 tiles apart!",
+    tooCloseCity: "❌ Colonies must be at least 2 tiles apart from other hubs!",
+    lobbyEdit: "Customize Identity"
   },
   ko: {
     title: "미크로시비타",
@@ -147,7 +157,7 @@ const TRANSLATIONS = {
     step1: "수도 정초",
     step1d: "전략적 요충지를 선택하세요. 국가의 심장이 될 곳입니다.",
     step2: "영토 확장",
-    step2d: "도시 주변을 개척하세요. 각 거점은 고유의 확장 한계를 가집니다.",
+    step2d: "주변을 개척하세요. 각 거점은 고유의 확장 한계를 가집니다.",
     step3: "세계 통일",
     step3d: "기술력 혹은 무력을 통해 모든 문명을 당신의 깃발 아래 두십시오.",
     start: "문명 개척",
@@ -223,7 +233,17 @@ const TRANSLATIONS = {
     notYourTurn: "다른 문명의 턴입니다",
     activePlayer: "{name}의 차례",
     map: "전략 지도",
-    status: "문명 정보"
+    status: "문명 정보",
+    pickTruceEnemy: "🕊️ 휴전을 제안할 적을 선택하십시오.",
+    forceTruceTitle: "권력 공고화",
+    forceTruceDesc: "도시를 점령했습니다! {name}와(과) 4년간의 강제 휴전 협정을 맺으시겠습니까?",
+    forceTruceAction: "강제 휴전",
+    continueWar: "전쟁 지속",
+    offerReceived: "외교 사절단",
+    offerDesc: "{name}이(가) 4년간의 평화 협정을 간곡히 요청합니다.",
+    tooCloseCap: "❌ 수도 간의 거리는 최소 5타일 이상이어야 합니다!",
+    tooCloseCity: "❌ 도시는 다른 거점과 최소 2타일 이상 떨어져야 합니다!",
+    lobbyEdit: "국적 및 문양 변경"
   }
 };
 
@@ -256,7 +276,11 @@ const claimAround = (pid: number, x: number, y: number, radius: number, playersA
       if (nx >= 0 && ny >= 0 && nx < size && ny < size) {
         if (gridArr[ny][nx].owner === null) {
           gridArr[ny][nx] = { owner: pid, type: 'land', control: controlId, level: 1 };
-          p.territory.add(`${ny},${nx}`);
+          const key = `${ny},${nx}`;
+          p.territory.add(key);
+          if (Math.abs(dx) <= radius && Math.abs(dy) <= radius && (gridArr[y][x].type === 'capital' || gridArr[y][x].type === 'city')) {
+             p.originalTerritories.add(key);
+          }
         }
       }
     }
@@ -281,7 +305,8 @@ const NavBtn = ({ active, icon, onClick }: { active: boolean, icon: React.ReactN
 const CivilizationIntel = ({ players, currentIdx, grid, t, getPlayerScore, myPlayerId, mode }: any) => (
   <div className="space-y-4">
     {players.map((p: Player) => {
-      const limit = 25 + p.cities.length * 10;
+      if (!p.name) return null; // Only show joined/configured players
+      const limit = 25 + (p.cities?.length || 0) * 10;
       return (
         <div key={p.id} className={`p-6 rounded-[2rem] border transition-all ${p.eliminated ? 'opacity-20 grayscale' : p.id === currentIdx ? 'bg-slate-800 border-yellow-500 shadow-2xl' : 'bg-slate-900 border-white/5'}`}>
           <div className="flex justify-between items-center mb-4">
@@ -289,9 +314,9 @@ const CivilizationIntel = ({ players, currentIdx, grid, t, getPlayerScore, myPla
             <div className="flex items-center gap-1 bg-slate-950 px-2 py-0.5 rounded-full text-[10px] font-black text-yellow-500 border border-white/5"><Star className="w-3 h-3"/> {getPlayerScore(p.id, players, grid)}</div>
           </div>
           <div className="space-y-3 opacity-80 text-[10px] font-bold">
-            <div className="flex justify-between"><span>{t('capLv', { lv: p.capitalLevel })}</span><span>{p.cities.length} {t('city')}</span></div>
-            <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden"><div className="h-full bg-yellow-500 transition-all duration-500" style={{ width: `${Math.min(100, (p.territory.size / limit) * 100)}%` }} /></div>
-            <div className="flex justify-between text-[8px] font-black text-slate-500 uppercase"><span>{t('status')}</span><span>{p.territory.size}/{limit}</span></div>
+            <div className="flex justify-between"><span>{t('capLv', { lv: p.capitalLevel })}</span><span>{(p.cities?.length || 0)} {t('city')}</span></div>
+            <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden"><div className="h-full bg-yellow-500 transition-all duration-500" style={{ width: `${Math.min(100, ((p.territory?.size || 0) / limit) * 100)}%` }} /></div>
+            <div className="flex justify-between text-[8px] font-black text-slate-500 uppercase"><span>{t('status')}</span><span>{(p.territory?.size || 0)}/{limit}</span></div>
           </div>
         </div>
       );
@@ -345,6 +370,7 @@ const App: React.FC = () => {
   const [gridSize, setGridSize] = useState<number>(15);
   const [expansionRemaining, setExpansionRemaining] = useState<number>(0);
   const [mobileView, setMobileView] = useState<MobileView>('map');
+  const [pendingTruceTarget, setPendingTruceTarget] = useState<number | null>(null);
 
   const [peer, setPeer] = useState<any>(null);
   const [roomId, setRoomId] = useState<string>('');
@@ -393,7 +419,7 @@ const App: React.FC = () => {
 
   const getPlayerScore = useCallback((pid: number, playersArr: Player[], gridArr: Cell[][]) => {
     const p = playersArr[pid];
-    if (!p || p.eliminated) return 0;
+    if (!p || p.eliminated || !p.territory) return 0;
     const buildingLevels: Record<string, number> = { 'capital': p.capitalLevel };
     let score = p.capitalLevel * 10;
     gridArr.forEach(row => row.forEach(cell => {
@@ -449,10 +475,10 @@ const App: React.FC = () => {
       setPhase('end'); 
       return { phase: 'end' as GamePhase, logs: finalLogs };
     }
-    const survivors = updatedPlayers.filter(p => !p.eliminated);
+    const survivors = updatedPlayers.filter(p => !p.eliminated && p.name);
     if (survivors.length === 1 && phaseRef.current !== 'setup') {
       const finalLogs = addLog(survivors[0].id, t('winner'), 'growth', currentLogs);
-      setPhase('end');
+      setPhase('end'); 
       return { phase: 'end' as GamePhase, logs: finalLogs };
     }
     return { phase: phaseRef.current as GamePhase, logs: currentLogs };
@@ -485,7 +511,8 @@ const App: React.FC = () => {
     const initialGrid: Cell[][] = Array.from({ length: size }).map(() =>
       Array.from({ length: size }).map(() => ({ owner: null, type: null, control: null, level: 1 }))
     );
-    const initialPlayers: Player[] = Array.from({ length: playerCount }).map((_, i) => ({
+    // Use existing lobby profiles if available, otherwise defaults
+    const finalPlayers: Player[] = Array.from({ length: playerCount }).map((_, i) => ({
       id: i,
       name: players[i]?.name || (lang === 'ko' ? `문명 ${i + 1}` : `Civ ${i + 1}`),
       color: players[i]?.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length],
@@ -502,15 +529,35 @@ const App: React.FC = () => {
       eliminated: false,
     }));
     setGrid(initialGrid);
-    setPlayers(initialPlayers);
+    setPlayers(finalPlayers);
     setUiState('game');
     setPhase('setup');
     const initLogs = addLog(-1, t('initLog'), 'info', []);
     showMessage(t('placeCap'));
     if (mode === 'online' && isHost) {
         connections.forEach((conn, i) => conn.send({ type: 'START_GAME', myId: i + 1 }));
-        syncGameState(initialPlayers, initialGrid, 0, 1, 'setup', initLogs);
+        syncGameState(finalPlayers, initialGrid, 0, 1, 'setup', initLogs);
     }
+  };
+
+  const establishTruce = (p1Id: number, p2Id: number, currentPlayers: Player[]) => {
+    const nextP = [...currentPlayers.map(pl => ({ 
+      ...pl, 
+      warWith: new Set(pl.warWith), 
+      truceWith: new Set(pl.truceWith), 
+      truceTurns: { ...pl.truceTurns },
+      truceProposals: new Set(pl.truceProposals)
+    }))];
+    
+    [p1Id, p2Id].forEach(id => {
+      const other = id === p1Id ? p2Id : p1Id;
+      nextP[id].warWith.delete(other);
+      nextP[id].truceWith.add(other);
+      nextP[id].truceTurns[other] = 4;
+      nextP[id].truceProposals.delete(other);
+    });
+    
+    return nextP;
   };
 
   const nextTurn = (updatedGrid?: Cell[][], updatedPlayers?: Player[], updatedLogs?: GameLogEntry[]) => {
@@ -556,12 +603,12 @@ const App: React.FC = () => {
     const finalPhase = winResult.phase;
     finalLogs = winResult.logs;
 
-    setPendingAction(null); setSelectableCells(new Set()); setExpansionRemaining(0);
+    setPendingAction(null); setSelectableCells(new Set()); setExpansionRemaining(0); setPendingTruceTarget(null);
     
     let nextIdx = (currentIdxRef.current + 1) % playerCount;
-    const areThereSurvivors = workingPlayers.some((pl, idx) => !pl.eliminated && idx !== currentIdxRef.current);
+    const areThereSurvivors = workingPlayers.some((pl, idx) => !pl.eliminated && pl.name && idx !== currentIdxRef.current);
     if (areThereSurvivors) {
-        while (workingPlayers[nextIdx] && workingPlayers[nextIdx].eliminated) { 
+        while (workingPlayers[nextIdx] && (workingPlayers[nextIdx].eliminated || !workingPlayers[nextIdx].name)) { 
             nextIdx = (nextIdx + 1) % playerCount; 
         }
     }
@@ -587,16 +634,28 @@ const App: React.FC = () => {
     if (!isMyTurn) return;
     if (phaseRef.current === 'setup') {
       if (gridRef.current[y][x].owner !== null) return;
+      
+      let tooClose = false;
+      playersRef.current.forEach(p => {
+        if (p.capital) {
+          const dist = Math.max(Math.abs(p.capital.x - x), Math.abs(p.capital.y - y));
+          if (dist < 5) tooClose = true;
+        }
+      });
+      if (tooClose) { showMessage(t('tooCloseCap')); return; }
+
       const newGrid = [...gridRef.current.map(row => [...row])];
-      const newPlayers = [...playersRef.current.map(p => ({ ...p, territory: new Set(p.territory) }))];
+      const newPlayers = [...playersRef.current.map(p => ({ ...p, territory: new Set(p.territory), originalTerritories: new Set(p.originalTerritories) }))];
       const p = { ...newPlayers[currentIdxRef.current] };
       p.capital = { x, y };
       p.territory.add(`${y},${x}`);
+      p.originalTerritories.add(`${y},${x}`);
       newGrid[y][x] = { owner: currentIdxRef.current, type: 'capital', control: 'capital', level: 1 };
       claimAround(currentIdxRef.current, x, y, 1, newPlayers, newGrid);
       newPlayers[currentIdxRef.current] = p;
       
-      const isLastPlayer = currentIdxRef.current === playerCount - 1;
+      const survivorsCount = newPlayers.filter(pl => pl.name).length;
+      const isLastPlayer = currentIdxRef.current === survivorsCount - 1;
       const nextPhase = isLastPlayer ? 'play' : 'setup';
       const nextIdx = isLastPlayer ? 0 : currentIdxRef.current + 1;
 
@@ -616,19 +675,48 @@ const App: React.FC = () => {
   const handleCityGrow = () => {
     if (!isMyTurn) return;
     if (currentPlayer.warWith.size > 0) { showMessage(t('warRestrict')); return; }
+    
     const validSpots: Set<string> = new Set();
     gridRef.current.forEach((row, y) => row.forEach((cell, x) => {
       if (cell.owner === null) {
         let near = false;
         currentPlayer.territory.forEach(k => { const [ty, tx] = k.split(',').map(Number); if (Math.abs(tx - x) <= 1 && Math.abs(ty - y) <= 1) near = true; });
+        
         let tooClose = false;
-        if (currentPlayer.capital && Math.abs(currentPlayer.capital.x - x) <= 2 && Math.abs(currentPlayer.capital.y - y) <= 2) tooClose = true;
-        currentPlayer.cities.forEach(c => { if (Math.abs(c.x - x) <= 2 && Math.abs(c.y - y) <= 2) tooClose = true; });
+        playersRef.current.forEach(p => {
+          if (p.capital) {
+            const dist = Math.max(Math.abs(p.capital.x - x), Math.abs(p.capital.y - y));
+            if (dist < 2) tooClose = true;
+          }
+          p.cities.forEach(c => {
+            const dist = Math.max(Math.abs(c.x - x), Math.abs(c.y - y));
+            if (dist < 2) tooClose = true;
+          });
+        });
+
         if (near && !tooClose) validSpots.add(`${y},${x}`);
       } else if (cell.owner === currentIdxRef.current && cell.type === 'city') {
         validSpots.add(`${y},${x}`);
       }
     }));
+
+    if (validSpots.size === 0) {
+      let anyDistanceBlocked = false;
+      gridRef.current.forEach((row, y) => row.forEach((cell, x) => {
+        if (cell.owner === null) {
+          let near = false;
+          currentPlayer.territory.forEach(k => { const [ty, tx] = k.split(',').map(Number); if (Math.abs(tx - x) <= 1 && Math.abs(ty - y) <= 1) near = true; });
+          if (near) {
+            playersRef.current.forEach(p => {
+              if (p.capital && Math.max(Math.abs(p.capital.x - x), Math.abs(p.capital.y - y)) < 2) anyDistanceBlocked = true;
+              p.cities.forEach(c => { if (Math.max(Math.abs(c.x - x), Math.abs(c.y - y)) < 2) anyDistanceBlocked = true; });
+            });
+          }
+        }
+      }));
+      if (anyDistanceBlocked) { showMessage(t('tooCloseCity')); return; }
+    }
+
     setSelectableCells(validSpots); showMessage(t('pickCity'));
     setPendingAction(() => (x: number, y: number) => {
       const key = `${y},${x}`; if (!validSpots.has(key)) return;
@@ -643,10 +731,11 @@ const App: React.FC = () => {
         const cityId = `city_${currentPlayer.cities.length}`;
         const newGrid = [...gridRef.current.map(r => [...r])];
         newGrid[y][x] = { owner: currentIdxRef.current, type: 'city', control: cityId, level: 1 };
-        const newPlayers = [...playersRef.current.map(pl => ({ ...pl, territory: new Set(pl.territory) }))];
+        const newPlayers = [...playersRef.current.map(pl => ({ ...pl, territory: new Set(pl.territory), originalTerritories: new Set(pl.originalTerritories) }))];
         const p = { ...newPlayers[currentIdxRef.current] };
         p.cities = [...p.cities, { x, y, id: cityId }];
         p.territory.add(key);
+        p.originalTerritories.add(key);
         newPlayers[currentIdxRef.current] = p;
         const newLogs = addLog(currentIdxRef.current, t('cityLog'), 'growth');
         nextTurn(newGrid, newPlayers, newLogs);
@@ -728,32 +817,49 @@ const App: React.FC = () => {
     let totalCaptured = 0;
     
     const nextGrid = [...gridRef.current.map(r => [...r])];
-    const nextPlayers = [...playersRef.current.map(p => ({ ...p, territory: new Set(p.territory) }))];
+    const nextPlayers = [...playersRef.current.map(p => ({ ...p, territory: new Set(p.territory), originalTerritories: new Set(p.originalTerritories) }))];
     const pAttacker = nextPlayers[currentIdxRef.current];
     let currentLogs = logsRef.current;
     
+    let forcedTrucePotentialId: number | null = null;
+
     targets.forEach(key => {
       const [ty, tx] = key.split(',').map(Number); const cell = nextGrid[ty][tx]; const oldOwnerId = cell.owner!;
       const defenderScore = getPlayerScore(oldOwnerId, nextPlayers, nextGrid);
       const successChance = Math.max(0.05, attackerScore / (attackerScore + defenderScore));
       if (Math.random() < successChance) {
         totalCaptured++;
+        const isTargetNonOriginalCity = (cell.type === 'capital' || cell.type === 'city') && !pAttacker.originalTerritories.has(key);
+
         if (cell.type === 'capital') {
           currentLogs = addLog(currentIdxRef.current, t('invadeCap', { name: nextPlayers[oldOwnerId].name }), 'war', currentLogs);
           nextPlayers[oldOwnerId].eliminated = true;
           nextGrid.forEach((row, gy) => row.forEach((c, gx) => { if (c.owner === oldOwnerId) { nextGrid[gy][gx] = { ...c, owner: currentIdxRef.current, control: 'captured' }; pAttacker.territory.add(`${gy},${gx}`); } }));
+          if (isTargetNonOriginalCity) forcedTrucePotentialId = oldOwnerId;
         } else if (cell.type === 'city') {
           const cityId = cell.control; 
           currentLogs = addLog(currentIdxRef.current, t('invadeCity', { name: nextPlayers[oldOwnerId].name }), 'war', currentLogs);
           nextGrid.forEach((row, gy) => row.forEach((c, gx) => { if (c.owner === oldOwnerId && c.control === cityId) { nextGrid[gy][gx] = { ...c, owner: currentIdxRef.current, control: `captured:from:${oldOwnerId}` }; pAttacker.territory.add(`${gy},${gx}`); nextPlayers[oldOwnerId].territory.delete(`${gy},${gx}`); } }));
+          if (isTargetNonOriginalCity) forcedTrucePotentialId = oldOwnerId;
         } else { nextGrid[ty][tx] = { ...cell, owner: currentIdxRef.current, control: 'captured' }; pAttacker.territory.add(key); nextPlayers[oldOwnerId].territory.delete(key); }
       }
     });
 
-    if (totalCaptured > 0) currentLogs = addLog(currentIdxRef.current, t('invadeSummary', { n: totalCaptured }), 'war', currentLogs); 
-    else currentLogs = addLog(currentIdxRef.current, t('invadeFailOnly'), 'info', currentLogs);
-    
-    nextTurn(nextGrid, nextPlayers, currentLogs);
+    if (totalCaptured > 0) {
+      currentLogs = addLog(currentIdxRef.current, t('invadeSummary', { n: totalCaptured }), 'war', currentLogs);
+      setGrid(nextGrid);
+      setPlayers(nextPlayers);
+      setLogs(currentLogs);
+      
+      if (forcedTrucePotentialId !== null && !nextPlayers[forcedTrucePotentialId].eliminated) {
+        setPendingTruceTarget(forcedTrucePotentialId);
+      } else {
+        nextTurn(nextGrid, nextPlayers, currentLogs);
+      }
+    } else {
+      currentLogs = addLog(currentIdxRef.current, t('invadeFailOnly'), 'info', currentLogs);
+      nextTurn(nextGrid, nextPlayers, currentLogs);
+    }
   };
 
   const handleWar = () => {
@@ -773,57 +879,61 @@ const App: React.FC = () => {
     });
   };
 
-  const resetToLanding = () => {
-    if (peer) peer.destroy();
-    setUiState('landing');
-    setPlayers([]);
-    setGrid([]);
-    setPhase('setup');
-    setGameTurn(1);
-    setLogs([]);
-    setCurrentIdx(0);
-    setConnections([]);
-    setPeer(null);
-    setOnlineStatus('idle');
-    setMobileView('map');
-  };
-
-  const handleHost = () => {
-    setOnlineStatus('connecting');
-    const newPeer = new Peer();
-    newPeer.on('open', (id: string) => {
-      setRoomId(id);
-      setIsHost(true);
-      isHostRef.current = true;
-      setMyPlayerId(0);
-      setOnlineStatus('lobby');
-      setPeer(newPeer);
-    });
-    newPeer.on('connection', (conn: any) => {
-      setConnections(prev => {
-        const next = [...prev, conn];
-        connectionsRef.current = next;
-        return next;
-      });
-      conn.on('data', (data: any) => handleIncomingData(data, conn));
+  const handleTruce = () => {
+    if (!isMyTurn) return;
+    if (currentPlayer.warWith.size === 0) return;
+    const enemyTerritories: Set<string> = new Set();
+    gridRef.current.forEach((row, y) => row.forEach((cell, x) => { 
+      if (cell.owner !== null && cell.owner !== currentIdxRef.current && currentPlayer.warWith.has(cell.owner)) {
+        enemyTerritories.add(`${y},${x}`);
+      }
+    }));
+    
+    setSelectableCells(enemyTerritories);
+    showMessage(t('pickTruceEnemy'));
+    setPendingAction(() => (x: number, y: number) => {
+      const targetCell = gridRef.current[y][x];
+      if (!enemyTerritories.has(`${y},${x}`)) return;
+      const targetId = targetCell.owner!;
+      const nextP = [...playersRef.current.map(pl => ({ ...pl, truceProposals: new Set(pl.truceProposals) }))];
+      nextP[targetId].truceProposals.add(currentIdxRef.current);
+      const nextLogs = addLog(currentIdxRef.current, t('truceNormalLog', { name: playersRef.current[targetId].name }), 'info');
+      nextTurn(gridRef.current, nextP, nextLogs);
     });
   };
 
-  const handleJoin = () => {
-    setOnlineStatus('connecting');
-    const newPeer = new Peer();
-    newPeer.on('open', () => {
-      setPeer(newPeer);
-      const conn = newPeer.connect(joinId);
-      conn.on('open', () => {
-        setConnections([conn]);
-        connectionsRef.current = [conn];
-        setIsHost(false);
-        isHostRef.current = false;
-        setOnlineStatus('lobby');
-      });
-      conn.on('data', (data: any) => handleIncomingData(data));
-    });
+  const respondToTruce = (proposingPlayerId: number, accept: boolean) => {
+    if (!isMyTurn) return;
+    let nextP = playersRef.current;
+    let nextLogs = logsRef.current;
+    
+    if (accept) {
+      nextP = establishTruce(currentIdxRef.current, proposingPlayerId, playersRef.current);
+      nextLogs = addLog(currentIdxRef.current, t('truceAcceptLog', { p1: currentPlayer.name, p2: players[proposingPlayerId].name }), 'peace');
+    } else {
+      nextP = [...playersRef.current.map(pl => ({ ...pl, truceProposals: new Set(pl.truceProposals) }))];
+      nextP[currentIdxRef.current].truceProposals.delete(proposingPlayerId);
+      nextLogs = addLog(currentIdxRef.current, t('truceDeclineLog', { name: currentPlayer.name }), 'info');
+    }
+    
+    setPlayers(nextP);
+    setLogs(nextLogs);
+    syncGameState(nextP, gridRef.current, currentIdxRef.current, turnRef.current, phaseRef.current, nextLogs);
+  };
+
+  const updateProfile = (name: string, color: string) => {
+    if (myPlayerId === null) return;
+    const nextPlayers = [...players];
+    nextPlayers[myPlayerId] = { ...nextPlayers[myPlayerId], name, color };
+    setPlayers(nextPlayers);
+    if (mode === 'online') {
+      const msg = { type: 'LOBBY_PROFILE', payload: { id: myPlayerId, name, color } };
+      if (isHostRef.current) {
+        connectionsRef.current.forEach(c => c.send(msg));
+      } else if (connectionsRef.current.length > 0) {
+        connectionsRef.current[0].send(msg);
+      }
+    }
   };
 
   const handleIncomingData = (data: any, conn?: any) => {
@@ -835,22 +945,66 @@ const App: React.FC = () => {
       const ph = data.payload.phase;
       const lg = data.payload.logs;
 
-      setPlayers(p);
-      setGrid(g);
-      setCurrentIdx(ci);
-      setGameTurn(turn);
-      setPhase(ph);
-      setLogs(lg);
-      setUiState('game');
-
-      if (isHostRef.current) {
-        connectionsRef.current.forEach(c => { if (c !== conn) c.send(data); });
-      }
+      setPlayers(p); setGrid(g); setCurrentIdx(ci); setGameTurn(turn); setPhase(ph); setLogs(lg); setUiState('game');
+      if (isHostRef.current) { connectionsRef.current.forEach(c => { if (c !== conn) c.send(data); }); }
     } else if (data.type === 'START_GAME') {
         setMyPlayerId(data.myId);
         setUiState('game');
+    } else if (data.type === 'LOBBY_PROFILE') {
+        const { id, name, color } = data.payload;
+        setPlayers(prev => {
+          const next = [...prev];
+          next[id] = { ...next[id], name, color };
+          return next;
+        });
+        if (isHostRef.current) {
+          connectionsRef.current.forEach(c => { if (c !== conn) c.send(data); });
+        }
+    } else if (data.type === 'LOBBY_SYNC_ALL') {
+        setPlayers(data.payload.players.map(deserializePlayer));
+        setMyPlayerId(data.payload.targetId);
     }
   };
+
+  const handleHost = () => {
+    setOnlineStatus('connecting');
+    const newPeer = new Peer();
+    newPeer.on('open', (id: string) => {
+      setRoomId(id); setIsHost(true); isHostRef.current = true; setMyPlayerId(0); setOnlineStatus('lobby'); setPeer(newPeer);
+      const initialP = Array.from({ length: 4 }).map((_, i) => ({
+        id: i, name: i === 0 ? (lang === 'ko' ? '방장' : 'Host') : '',
+        color: DEFAULT_COLORS[i % DEFAULT_COLORS.length],
+        territory: new Set<string>(), warWith: new Set<PlayerID>(), truceWith: new Set<PlayerID>(),
+        truceTurns: {} as Record<PlayerID, number>, truceProposals: new Set<PlayerID>(), eliminated: false, capital: null, capitalLevel: 1, capitalUpgrade: null, cities: [], originalTerritories: new Set<string>()
+      }));
+      setPlayers(initialP);
+    });
+    newPeer.on('connection', (conn: any) => {
+      setConnections(prev => { const next = [...prev, conn]; connectionsRef.current = next; return next; });
+      conn.on('open', () => {
+        const nextId = connectionsRef.current.length;
+        const currentPlayers = [...playersRef.current];
+        currentPlayers[nextId] = { ...currentPlayers[nextId], name: `Player ${nextId + 1}` };
+        setPlayers(currentPlayers);
+        conn.send({ type: 'LOBBY_SYNC_ALL', payload: { players: currentPlayers.map(serializePlayer), targetId: nextId } });
+        connectionsRef.current.forEach(c => { if (c !== conn) c.send({ type: 'LOBBY_PROFILE', payload: { id: nextId, name: `Player ${nextId+1}`, color: currentPlayers[nextId].color } }); });
+      });
+      conn.on('data', (data: any) => handleIncomingData(data, conn));
+    });
+  };
+
+  const handleJoin = () => {
+    setOnlineStatus('connecting');
+    const newPeer = new Peer();
+    newPeer.on('open', () => {
+      setPeer(newPeer);
+      const conn = newPeer.connect(joinId);
+      conn.on('open', () => { setConnections([conn]); connectionsRef.current = [conn]; setIsHost(false); isHostRef.current = false; setOnlineStatus('lobby'); });
+      conn.on('data', (data: any) => handleIncomingData(data));
+    });
+  };
+
+  const resetToLanding = () => { if (peer) peer.destroy(); setUiState('landing'); setPlayers([]); setGrid([]); setPhase('setup'); setGameTurn(1); setLogs([]); setCurrentIdx(0); setConnections([]); setPeer(null); setOnlineStatus('idle'); setMobileView('map'); };
 
   const Hero = () => (
     <section className="relative min-h-screen flex flex-col items-center justify-center p-8 overflow-hidden">
@@ -929,22 +1083,7 @@ const App: React.FC = () => {
             <FeatureCard icon={<Bird className="text-cyan-400" />} title={t('f3')} desc={t('f3d')} />
           </div>
         </section>
-        <section className="py-32 px-8">
-          <div className="max-w-5xl mx-auto space-y-24">
-            <div className="text-center space-y-4"><h2 className="text-5xl font-black">{t('howToTitle')}</h2><p className="text-slate-500 font-bold">Master the art of rule.</p></div>
-            <div className="grid gap-12">
-              <GuideStep num="01" title={t('step1')} desc={t('step1d')} icon={<Landmark className="text-yellow-500" />} />
-              <GuideStep num="02" title={t('step2')} desc={t('step2d')} icon={<MapIcon className="text-blue-500" />} />
-              <GuideStep num="03" title={t('step3')} desc={t('step3d')} icon={<Trophy className="text-emerald-500" />} />
-            </div>
-          </div>
-        </section>
-        <footer className="py-24 border-t border-slate-900 text-center space-y-8">
-          <div className="flex justify-center gap-8 opacity-40 hover:opacity-100 transition-all">
-            <Github className="w-6 h-6" /> <Twitter className="w-6 h-6" /> <MessageSquare className="w-6 h-6" />
-          </div>
-          <p className="text-slate-600 font-bold text-sm">© 2024 MIKROCIVITA. ALL RIGHTS RESERVED.</p>
-        </footer>
+        <footer className="py-24 border-t border-slate-900 text-center text-slate-600 font-bold text-sm">© 2024 MIKROCIVITA. ALL RIGHTS RESERVED.</footer>
       </div>
     );
   }
@@ -952,7 +1091,7 @@ const App: React.FC = () => {
   if (uiState === 'online_setup') {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-8 text-white">
-        <div className="max-w-2xl w-full space-y-8">
+        <div className="max-w-4xl w-full space-y-8">
           <div className="text-center space-y-4">
             <Globe className="w-16 h-16 mx-auto text-cyan-400 animate-pulse" />
             <h2 className="text-5xl font-black uppercase tracking-tighter">{t('multiplayer')}</h2>
@@ -972,27 +1111,43 @@ const App: React.FC = () => {
           ) : onlineStatus === 'connecting' ? (
             <div className="text-center py-12 space-y-4"><div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" /><p className="font-bold text-slate-500">{t('connecting')}</p></div>
           ) : (
-            <div className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] space-y-8">
-              <div className="flex justify-between items-center">
-                <div className="space-y-1"><span className="text-[10px] font-black uppercase text-slate-500">Room Code</span><div className="flex items-center gap-3"><span className="text-3xl font-mono font-black text-cyan-400">{roomId || joinId}</span><button onClick={() => { navigator.clipboard.writeText(roomId || joinId); showMessage('Copied!'); }}><Copy className="w-5 h-5 text-slate-500" /></button></div></div>
-                <div className="bg-slate-950 px-4 py-2 rounded-2xl border border-slate-800"><span className="text-[10px] block font-black text-slate-500">{t('youAre')}</span><span className="font-black text-sm">{isHost ? t('host') : t('client')}</span></div>
-              </div>
-              <div className="space-y-4 border-t border-slate-800 pt-8">
-                <h4 className="text-xs font-black text-slate-500 flex items-center gap-2"><Users className="w-4 h-4" /> Players ({connections.length + 1})</h4>
-                <div className="flex gap-2">
-                  <div className="px-4 py-2 bg-slate-950 rounded-full border border-yellow-500/30 text-yellow-500 font-bold text-xs flex items-center gap-2"><Star className="w-3 h-3" fill="currentColor" /> {t('host')}</div>
-                  {connections.map((_, i) => <div key={i} className="px-4 py-2 bg-slate-950 rounded-full border border-slate-800 text-slate-500 font-bold text-xs">Empire {i+2}</div>)}
+            <div className="grid lg:grid-cols-5 gap-8">
+              <div className="lg:col-span-3 space-y-8 bg-slate-900 border border-slate-800 p-8 rounded-[3rem]">
+                <div className="flex justify-between items-center">
+                  <div className="space-y-1"><span className="text-[10px] font-black uppercase text-slate-500">Room Code</span><div className="flex items-center gap-3"><span className="text-3xl font-mono font-black text-cyan-400">{roomId || joinId}</span><button onClick={() => { navigator.clipboard.writeText(roomId || joinId); showMessage('Copied!'); }}><Copy className="w-5 h-5 text-slate-500" /></button></div></div>
+                  <div className="bg-slate-950 px-4 py-2 rounded-2xl border border-slate-800"><span className="text-[10px] block font-black text-slate-500">{t('youAre')}</span><span className="font-black text-sm">{isHost ? t('host') : t('client')}</span></div>
                 </div>
-              </div>
-              {isHost && (
-                <div className="pt-8 space-y-6">
-                  <div className="flex items-center justify-center gap-4">
-                    <span className="font-bold text-slate-400">{t('players')}</span>
-                    {[2,3,4].map(n => <button key={n} onClick={() => setPlayerCount(n)} className={`w-12 h-12 rounded-xl font-black ${playerCount === n ? 'bg-yellow-500 text-slate-950' : 'bg-slate-800 text-slate-500'}`}>{n}</button>)}
+                <div className="space-y-6 pt-8 border-t border-slate-800">
+                  <div className="flex items-center gap-3"><User className="text-yellow-500 w-6 h-6" /><h4 className="font-black uppercase tracking-widest text-sm">{t('lobbyEdit')}</h4></div>
+                  <div className="space-y-4">
+                    <input value={players[myPlayerId!]?.name || ''} onChange={e => updateProfile(e.target.value, players[myPlayerId!]?.color)} placeholder={t('namePlace')} className="w-full bg-slate-950 border border-slate-800 p-4 rounded-xl font-bold outline-none ring-yellow-500/30 focus:ring-2" />
+                    <div className="flex gap-2 flex-wrap">{DEFAULT_COLORS.map(c => <button key={c} onClick={() => updateProfile(players[myPlayerId!]?.name, c)} style={{ backgroundColor: c }} className={`w-10 h-10 rounded-xl border-2 transition-all ${players[myPlayerId!]?.color === c ? 'border-white scale-110 shadow-lg' : 'border-transparent opacity-40'}`} />)}</div>
                   </div>
-                  <button onClick={initGameGrid} disabled={connections.length < playerCount-1} className="w-full py-6 bg-yellow-500 text-slate-950 font-black text-2xl rounded-3xl disabled:opacity-20">{t('start')}</button>
                 </div>
-              )}
+                {isHost && (
+                  <div className="pt-8 space-y-6 border-t border-slate-800">
+                    <div className="flex items-center justify-center gap-4">
+                      <span className="font-bold text-slate-400">{t('players')}</span>
+                      {[2,3,4].map(n => <button key={n} onClick={() => setPlayerCount(n)} className={`w-12 h-12 rounded-xl font-black ${playerCount === n ? 'bg-yellow-500 text-slate-950' : 'bg-slate-800 text-slate-500'}`}>{n}</button>)}
+                    </div>
+                    <button onClick={initGameGrid} disabled={players.filter(p => p.name).length < playerCount} className="w-full py-6 bg-yellow-500 text-slate-950 font-black text-2xl rounded-3xl disabled:opacity-20">{t('start')}</button>
+                  </div>
+                )}
+              </div>
+              <div className="lg:col-span-2 bg-slate-900 border border-slate-800 p-8 rounded-[3rem] space-y-6">
+                <h4 className="text-xs font-black text-slate-500 flex items-center gap-2 uppercase tracking-widest"><Users className="w-4 h-4" /> Enrolled Empires</h4>
+                <div className="space-y-3">
+                  {players.map((p, i) => p.name ? (
+                    <div key={i} className="flex items-center justify-between p-4 bg-slate-950 rounded-2xl border border-white/5">
+                      <div className="flex items-center gap-3"><div className="w-4 h-4 rounded-full" style={{ backgroundColor: p.color }} /><span className="font-black text-sm">{p.name} {i === 0 && <span className="text-[10px] text-yellow-500 opacity-50 ml-1">(HOST)</span>}</span></div>
+                      {myPlayerId === i && <Monitor className="w-4 h-4 text-cyan-500" />}
+                    </div>
+                  ) : null)}
+                  {Array.from({ length: Math.max(0, playerCount - players.filter(p => p.name).length) }).map((_, i) => (
+                    <div key={`wait-${i}`} className="p-4 border border-dashed border-slate-800 rounded-2xl text-center text-[10px] font-black text-slate-700 uppercase tracking-widest animate-pulse">Waiting for empire...</div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
           <button onClick={resetToLanding} className="w-full text-slate-600 font-bold hover:text-white transition-all">{t('reset')}</button>
@@ -1029,6 +1184,38 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {isMyTurn && pendingTruceTarget !== null && (
+        <div className="absolute inset-0 z-[150] bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-8">
+           <div className="max-w-md w-full bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 space-y-8 animate-in zoom-in-95 duration-300 shadow-2xl">
+              <div className="text-center space-y-4">
+                 <Handshake className="w-16 h-16 mx-auto text-cyan-400" />
+                 <h2 className="text-3xl font-black">{t('forceTruceTitle')}</h2>
+                 <p className="text-slate-400 font-bold">{t('forceTruceDesc', { name: players[pendingTruceTarget]?.name })}</p>
+              </div>
+              <div className="flex flex-col gap-3">
+                 <button onClick={() => { const nextP = establishTruce(currentIdx, pendingTruceTarget, players); const nextLogs = addLog(currentIdx, t('truceForcedLog', { name: players[pendingTruceTarget].name }), 'peace'); nextTurn(grid, nextP, nextLogs); }} className="w-full py-4 bg-cyan-600 text-white font-black rounded-2xl hover:bg-cyan-500 transition-all shadow-xl">{t('forceTruceAction')}</button>
+                 <button onClick={() => nextTurn(grid, players, logs)} className="w-full py-4 bg-slate-800 text-slate-400 font-bold rounded-2xl hover:bg-slate-700 transition-all">{t('continueWar')}</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {isMyTurn && !pendingTruceTarget && currentPlayer?.truceProposals?.size > 0 && (
+        <div className="absolute inset-0 z-[150] bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-8">
+           <div className="max-w-md w-full bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 space-y-8 animate-in zoom-in-95 duration-300 shadow-2xl">
+              <div className="text-center space-y-4">
+                 <Bird className="w-16 h-16 mx-auto text-cyan-400" />
+                 <h2 className="text-3xl font-black">{t('offerReceived')}</h2>
+                 <p className="text-slate-400 font-bold">{t('offerDesc', { name: players[Array.from(currentPlayer.truceProposals)[0] as number]?.name })}</p>
+              </div>
+              <div className="flex gap-4">
+                 <button onClick={() => respondToTruce(Array.from(currentPlayer.truceProposals)[0] as number, true)} className="flex-1 py-4 bg-emerald-600 text-white font-black rounded-2xl hover:bg-emerald-500 transition-all">{t('accept')}</button>
+                 <button onClick={() => respondToTruce(Array.from(currentPlayer.truceProposals)[0] as number, false)} className="flex-1 py-4 bg-red-900/50 text-red-400 font-black rounded-2xl hover:bg-red-900/80 transition-all">{t('decline')}</button>
+              </div>
+           </div>
+        </div>
+      )}
+
       <aside className="hidden lg:flex w-72 bg-slate-900/40 backdrop-blur-3xl border-r border-white/5 flex-col z-20 shrink-0">
         <div className="p-8 border-b border-white/5 flex items-center gap-3"><Landmark className="w-6 h-6 text-yellow-500" /><h1 className="font-black tracking-tighter uppercase text-2xl">{t('title')}</h1></div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -1040,75 +1227,33 @@ const App: React.FC = () => {
       <section className="flex-1 flex flex-col relative overflow-hidden">
         <div className="lg:hidden flex bg-slate-900/80 backdrop-blur-xl border-b border-white/5 px-6 py-4 justify-between items-center z-50">
            <div className="flex items-center gap-2 font-black tracking-tighter uppercase text-sm"><Landmark className="w-5 h-5 text-yellow-500" /> {t('title')}</div>
-           <div className="flex gap-2">
-              <NavBtn active={mobileView === 'map'} icon={<LayoutGrid />} onClick={() => setMobileView('map')} />
-              <NavBtn active={mobileView === 'status'} icon={<Users />} onClick={() => setMobileView('status')} />
-              <NavBtn active={mobileView === 'logs'} icon={<List />} onClick={() => setMobileView('logs')} />
-           </div>
+           <div className="flex gap-2"><NavBtn active={mobileView === 'map'} icon={<LayoutGrid />} onClick={() => setMobileView('map')} /><NavBtn active={mobileView === 'status'} icon={<Users />} onClick={() => setMobileView('status')} /><NavBtn active={mobileView === 'logs'} icon={<List />} onClick={() => setMobileView('logs')} /></div>
         </div>
-
         <div className="flex-1 relative overflow-hidden flex flex-col">
-          <div className={`flex-1 overflow-auto touch-pan-x touch-pan-y z-10 scrollbar-hide ${mobileView === 'map' ? 'block' : 'hidden lg:block'}`}>
-            <div className="min-h-full min-w-full flex items-center justify-center p-8 sm:p-12">
-              <div className="min-w-max bg-slate-900/50 p-6 rounded-[2rem] border border-white/5 shadow-2xl backdrop-blur-md">
-                 {renderGrid}
-              </div>
-            </div>
-          </div>
+          <div className={`flex-1 overflow-auto touch-pan-x touch-pan-y z-10 scrollbar-hide ${mobileView === 'map' ? 'block' : 'hidden lg:block'}`}><div className="min-h-full min-w-full flex items-center justify-center p-8 sm:p-12"><div className="min-w-max bg-slate-900/50 p-6 rounded-[2rem] border border-white/5 shadow-2xl backdrop-blur-md">{renderGrid}</div></div></div>
           {mobileView === 'status' && <div className="lg:hidden flex-1 bg-slate-950 overflow-y-auto p-6"><CivilizationIntel players={players} currentIdx={currentIdx} gameTurn={gameTurn} grid={grid} t={t} getPlayerScore={getPlayerScore} myPlayerId={myPlayerId} mode={mode} /></div>}
           {mobileView === 'logs' && <div className="lg:hidden flex-1 bg-slate-950 overflow-y-auto p-6"><LogChronicle logs={logs} players={players} t={t} /></div>}
         </div>
-
         {phase === 'play' && mobileView === 'map' && (
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[60] flex flex-col items-center gap-4 w-full max-w-4xl px-4 animate-in slide-in-from-bottom-12 duration-500">
-             {currentPlayer && (
-               <div className="flex items-center gap-3 px-6 py-2 bg-slate-950/80 border border-white/5 rounded-full shadow-2xl backdrop-blur-xl">
-                 <div className="w-3 h-3 rounded-full animate-pulse" style={{ backgroundColor: currentPlayer.color }} />
-                 <span className="text-xs font-black uppercase tracking-widest" style={{ color: currentPlayer.color }}>{t('activePlayer', { name: currentPlayer.name })}</span>
-               </div>
-             )}
+             {currentPlayer && <div className="flex items-center gap-3 px-6 py-2 bg-slate-950/80 border border-white/5 rounded-full shadow-2xl backdrop-blur-xl"><div className="w-3 h-3 rounded-full animate-pulse" style={{ backgroundColor: currentPlayer.color }} /><span className="text-xs font-black uppercase tracking-widest" style={{ color: currentPlayer.color }}>{t('activePlayer', { name: currentPlayer.name })}</span></div>}
              <div className="flex flex-col sm:flex-row gap-4 w-full items-center justify-center">
                 <div className="bg-slate-900/80 backdrop-blur-2xl border border-white/5 p-2 rounded-[2.5rem] flex flex-nowrap gap-2 shadow-2xl overflow-x-auto max-w-full scrollbar-hide snap-x touch-pan-x px-6 sm:px-2">
-                  <HUDButton icon={<SquareArrowUp />} label={t('growCap')} color="yellow" onClick={() => { 
-                     if (!currentPlayer.capitalUpgrade) { 
-                       const next = currentPlayer.capitalLevel + 1; 
-                       const nextPlayers = [...players]; const p = {...nextPlayers[currentIdx]}; 
-                       p.capitalUpgrade = { targetLevel: next, remaining: getUpgradeCooldown(next) }; 
-                       nextPlayers[currentIdx] = p; 
-                       const newLogs = addLog(currentIdx, t('capUpStart', { lv: next }), 'growth'); 
-                       nextTurn(grid, nextPlayers, newLogs); 
-                     } 
-                   }} active={!!currentPlayer.capitalUpgrade} disabled={!isMyTurn} badge={currentPlayer.capitalUpgrade ? `${currentPlayer.capitalUpgrade.remaining}T` : null}/>
-                  <HUDButton icon={<Building2 />} label={t('cityBuild')} color="emerald" onClick={handleCityGrow} disabled={!isMyTurn}/>
-                  <HUDButton icon={<MapIcon />} label={t('expand')} color="blue" onClick={handleExpand} disabled={!isMyTurn} badge={expansionRemaining > 0 ? `+${expansionRemaining}` : null}/>
+                  <HUDButton icon={<SquareArrowUp />} label={t('growCap')} color="yellow" onClick={() => { if (!currentPlayer.capitalUpgrade) { const next = currentPlayer.capitalLevel + 1; const nextPlayers = [...players]; const p = {...nextPlayers[currentIdx]}; p.capitalUpgrade = { targetLevel: next, remaining: getUpgradeCooldown(next) }; nextPlayers[currentIdx] = p; const newLogs = addLog(currentIdx, t('capUpStart', { lv: next }), 'growth'); nextTurn(grid, nextPlayers, newLogs); } }} active={!!currentPlayer.capitalUpgrade} disabled={!isMyTurn || !!pendingTruceTarget} badge={currentPlayer.capitalUpgrade ? `${currentPlayer.capitalUpgrade.remaining}T` : null}/>
+                  <HUDButton icon={<Building2 />} label={t('cityBuild')} color="emerald" onClick={handleCityGrow} disabled={!isMyTurn || !!pendingTruceTarget}/>
+                  <HUDButton icon={<MapIcon />} label={t('expand')} color="blue" onClick={handleExpand} disabled={!isMyTurn || !!pendingTruceTarget} badge={expansionRemaining > 0 ? `+${expansionRemaining}` : null}/>
                   <div className="w-px bg-white/5 my-4 mx-2 shrink-0 self-stretch" />
-                  <HUDButton icon={<Sword />} label={t('decWar')} color="red" onClick={handleWar} disabled={!isMyTurn}/>
-                  <HUDButton icon={<Swords />} label={t('invade')} color="orange" onClick={handleInvasion} disabled={!isMyTurn || currentPlayer.warWith.size === 0}/>
-                  <HUDButton icon={<Bird className="w-5 h-5" />} label={t('truce')} color="cyan" onClick={() => {}} disabled={!isMyTurn || currentPlayer.warWith.size === 0}/>
+                  <HUDButton icon={<Sword />} label={t('decWar')} color="red" onClick={handleWar} disabled={!isMyTurn || !!pendingTruceTarget}/>
+                  <HUDButton icon={<Swords />} label={t('invade')} color="orange" onClick={handleInvasion} disabled={!isMyTurn || !!pendingTruceTarget || (currentPlayer.warWith?.size || 0) === 0}/>
+                  <HUDButton icon={<Bird className="w-5 h-5" />} label={t('truce')} color="cyan" onClick={handleTruce} disabled={!isMyTurn || !!pendingTruceTarget || (currentPlayer.warWith?.size || 0) === 0}/>
                 </div>
                 <button onClick={() => nextTurn()} disabled={!isMyTurn} className="w-full sm:w-auto px-10 py-5 bg-white text-slate-950 rounded-[2rem] font-black text-lg hover:scale-105 transition-all shadow-2xl active:scale-95 flex items-center justify-center gap-3 shrink-0 whitespace-nowrap disabled:opacity-20">{t('endTurn')} <ChevronRight className="w-6 h-6"/></button>
              </div>
           </div>
         )}
-
-        {phase === 'end' && (
-          <div className="absolute inset-0 z-[200] bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center p-8">
-            <div className="max-w-xl w-full bg-slate-900 border border-white/5 rounded-[3rem] p-12 text-center space-y-8 animate-in zoom-in-95 duration-500 shadow-2xl">
-               <Trophy className="w-24 h-24 mx-auto text-yellow-500 drop-shadow-[0_0_30px_rgba(234,179,8,0.5)]" />
-               <div className="space-y-4">
-                 <h2 className="text-6xl font-black">{t('victory')}</h2>
-                 <p className="text-xl text-slate-400 font-bold uppercase tracking-widest">{players.find(p => !p.eliminated || p.capitalLevel >= 10)?.name} {t('winner')}</p>
-               </div>
-               <button onClick={resetToLanding} className="w-full py-6 bg-yellow-500 text-slate-950 font-black text-2xl rounded-3xl hover:bg-yellow-400 active:scale-95 transition-all">{t('restart')}</button>
-            </div>
-          </div>
-        )}
+        {phase === 'end' && <div className="absolute inset-0 z-[200] bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center p-8"><div className="max-w-xl w-full bg-slate-900 border border-white/5 rounded-[3rem] p-12 text-center space-y-8 animate-in zoom-in-95 duration-500 shadow-2xl"><Trophy className="w-24 h-24 mx-auto text-yellow-500 drop-shadow-[0_0_30px_rgba(234,179,8,0.5)]" /><div className="space-y-4"><h2 className="text-6xl font-black">{t('victory')}</h2><p className="text-xl text-slate-400 font-bold uppercase tracking-widest">{players.find(p => !p.eliminated && p.name)?.name} {t('winner')}</p></div><button onClick={resetToLanding} className="w-full py-6 bg-yellow-500 text-slate-950 font-black text-2xl rounded-3xl hover:bg-yellow-400 active:scale-95 transition-all">{t('restart')}</button></div></div>}
       </section>
-
-      <aside className="hidden lg:flex w-80 bg-slate-900/40 backdrop-blur-3xl border-l border-white/5 flex-col z-20 shrink-0">
-        <div className="p-8 border-b border-white/5"><h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">{t('logs')}</h3></div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin"><LogChronicle logs={logs} players={players} t={t} /></div>
-      </aside>
+      <aside className="hidden lg:flex w-80 bg-slate-900/40 backdrop-blur-3xl border-l border-white/5 flex-col z-20 shrink-0"><div className="p-8 border-b border-white/5"><h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">{t('logs')}</h3></div><div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin"><LogChronicle logs={logs} players={players} t={t} /></div></aside>
     </div>
   );
 };
