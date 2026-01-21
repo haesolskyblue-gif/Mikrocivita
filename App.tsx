@@ -239,14 +239,14 @@ const TRANSLATIONS = {
     tut2: "확장: '영토 확장'을 통해 땅을 개척하세요. 수도는 25타일, 도시는 10타일까지 가능하며 편입된 땅은 타일당 3점입니다.",
     tut3: "침공과 외지: 적을 공격해 땅을 뺏으세요. 하지만 '점령지(외지)'는 불안정합니다: 방어력이 50% 낮고 점수는 타일당 1점뿐입니다.",
     tut4: "공고화: 휴전 협정을 통해 점령지를 완전한 영토로 편입하세요. 수도 10레벨 달성 시 기술 승리를 거둡니다!",
-    publicLobby: "공개 로비",
-    privateRoom: "비공개 세션",
-    roomName: "방 이름",
-    privacy: "공개 여부",
-    public: "전체 공개",
-    private: "암호화(비공개)",
-    noRooms: "참여 가능한 공개 작전이 없습니다.",
-    refresh: "정보 갱신",
+    publicLobby: "Public Lobby",
+    privateRoom: "Private Session",
+    roomName: "Room Name",
+    privacy: "Visibility",
+    public: "Public",
+    private: "Private",
+    noRooms: "No public warzones found.",
+    refresh: "Refresh Intel",
     roomNamePrefix: "작전 구역"
   }
 };
@@ -881,14 +881,10 @@ const App: React.FC = () => {
 
   const resetToLanding = () => { if (peer) peer.destroy(); setUiState('landing'); setPlayers([]); setGrid([]); setPhase('setup'); setGameTurn(1); setLogs([]); setCurrentIdx(0); setConnections([]); setPeer(null); setOnlineStatus('idle'); setMobileView('map'); setIsTutorial(false); setTutStep(0); setRoomName('New World Era'); setIsPublic(true); setPublicRooms([]); };
 
-  // This function is no longer used to populate publicRooms directly,
-  // as actual hosted rooms will be added to the state. It returns an empty array as per previous request.
-  const getEmptyPublicRooms = useCallback(() => {
+  // This function is for clearing public rooms as per previous request.
+  const clearPublicRooms = useCallback(() => {
     return []; 
   }, []);
-
-  // Removed the useEffect that would overwrite publicRooms with an empty mock list.
-  // This allows the publicRooms state to accumulate actual hosted rooms.
 
   /**
    * Handles incoming peer data, parsing the message type and updating state accordingly.
@@ -922,6 +918,29 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const handleRefreshPublicRooms = useCallback(() => {
+    if (isHost && roomId) {
+        // If the current user is the host and has an active public room, show it.
+        setPublicRooms([{
+            id: roomId,
+            name: roomName,
+            currentPlayers: connections.length + 1, // Host + all connected clients
+            maxPlayers: playerCount,
+            hostName: playersRef.current[0]?.name || (lang === 'ko' ? '방장' : 'Host')
+        }]);
+    } else {
+        // For clients or if no public room is actively hosted by this user, clear the list.
+        setPublicRooms(clearPublicRooms());
+    }
+  }, [isHost, roomId, roomName, connections.length, playerCount, playersRef, lang, clearPublicRooms]);
+
+  useEffect(() => {
+    // When entering discovery mode, trigger a refresh to show any relevant rooms (currently only self-hosted public ones).
+    if (onlineStatus === 'discovery') {
+        handleRefreshPublicRooms();
+    }
+  }, [onlineStatus, handleRefreshPublicRooms]); // Refresh public rooms when online status changes
+
   const handleHost = useCallback(() => {
     setOnlineStatus('connecting');
     const p = new Peer();
@@ -934,6 +953,7 @@ const App: React.FC = () => {
 
       if (isPublic) {
           // Add the newly created public room to the list so the host can see it.
+          // This happens locally; true discovery for others needs a backend.
           setPublicRooms(prev => [...prev, { id: id, name: roomName, currentPlayers: 1, maxPlayers: playerCount, hostName: playersRef.current[0]?.name || (lang === 'ko' ? '방장' : 'Host') }]);
       }
     });
@@ -1130,7 +1150,7 @@ const App: React.FC = () => {
                   <div className="bg-slate-900/80 border border-slate-800 p-8 rounded-[2.5rem] space-y-4 shadow-xl animate-in zoom-in-95 duration-300 min-h-[300px]">
                     <div className="flex justify-between items-center mb-2">
                        <h3 className="text-xs font-black uppercase text-slate-500 tracking-[0.2em]">{t('publicLobby')}</h3>
-                       <button onClick={() => setPublicRooms(getEmptyPublicRooms())} className="text-[10px] font-black text-cyan-500 hover:text-cyan-400 transition-colors uppercase flex items-center gap-2"><RotateCcw className="w-3 h-3"/> {t('refresh')}</button>
+                       <button onClick={handleRefreshPublicRooms} className="text-[10px] font-black text-cyan-500 hover:text-cyan-400 transition-colors uppercase flex items-center gap-2"><RotateCcw className="w-3 h-3"/> {t('refresh')}</button>
                     </div>
                     <div className="space-y-3">
                        {publicRooms.length > 0 ? (
