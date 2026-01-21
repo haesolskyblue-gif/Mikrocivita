@@ -881,17 +881,14 @@ const App: React.FC = () => {
 
   const resetToLanding = () => { if (peer) peer.destroy(); setUiState('landing'); setPlayers([]); setGrid([]); setPhase('setup'); setGameTurn(1); setLogs([]); setCurrentIdx(0); setConnections([]); setPeer(null); setOnlineStatus('idle'); setMobileView('map'); setIsTutorial(false); setTutStep(0); setRoomName('New World Era'); setIsPublic(true); setPublicRooms([]); };
 
-  // Mock public rooms data for UI demonstration
-  const getMockPublicRooms = useCallback(() => {
-    // Removed hardcoded mock rooms. In a real app, this would fetch from a backend.
+  // This function is no longer used to populate publicRooms directly,
+  // as actual hosted rooms will be added to the state. It returns an empty array as per previous request.
+  const getEmptyPublicRooms = useCallback(() => {
     return []; 
   }, []);
 
-  useEffect(() => {
-    if (onlineStatus === 'discovery') {
-        setPublicRooms(getMockPublicRooms());
-    }
-  }, [onlineStatus, getMockPublicRooms]); // Refresh mock rooms when language or status changes
+  // Removed the useEffect that would overwrite publicRooms with an empty mock list.
+  // This allows the publicRooms state to accumulate actual hosted rooms.
 
   /**
    * Handles incoming peer data, parsing the message type and updating state accordingly.
@@ -936,9 +933,8 @@ const App: React.FC = () => {
       }]);
 
       if (isPublic) {
-          // In a real application, this would send a message to a discovery server
-          // to register the public room. For this P2P setup, we mock it locally for UI.
-          // setPublicRooms(prev => [...prev, { id: id, name: roomName, currentPlayers: 1, maxPlayers: playerCount, hostName: playersRef.current[0]?.name || (lang === 'ko' ? '방장' : 'Host') }]);
+          // Add the newly created public room to the list so the host can see it.
+          setPublicRooms(prev => [...prev, { id: id, name: roomName, currentPlayers: 1, maxPlayers: playerCount, hostName: playersRef.current[0]?.name || (lang === 'ko' ? '방장' : 'Host') }]);
       }
     });
     p.on('connection', (conn: any) => {
@@ -1134,7 +1130,7 @@ const App: React.FC = () => {
                   <div className="bg-slate-900/80 border border-slate-800 p-8 rounded-[2.5rem] space-y-4 shadow-xl animate-in zoom-in-95 duration-300 min-h-[300px]">
                     <div className="flex justify-between items-center mb-2">
                        <h3 className="text-xs font-black uppercase text-slate-500 tracking-[0.2em]">{t('publicLobby')}</h3>
-                       <button onClick={() => setPublicRooms(getMockPublicRooms())} className="text-[10px] font-black text-cyan-500 hover:text-cyan-400 transition-colors uppercase flex items-center gap-2"><RotateCcw className="w-3 h-3"/> {t('refresh')}</button>
+                       <button onClick={() => setPublicRooms(getEmptyPublicRooms())} className="text-[10px] font-black text-cyan-500 hover:text-cyan-400 transition-colors uppercase flex items-center gap-2"><RotateCcw className="w-3 h-3"/> {t('refresh')}</button>
                     </div>
                     <div className="space-y-3">
                        {publicRooms.length > 0 ? (
